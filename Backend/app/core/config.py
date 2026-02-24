@@ -12,10 +12,24 @@ def _get_bool_env(name: str, default: bool = False) -> bool:
 
 
 def _get_cors_origins() -> list[str]:
-    raw = os.getenv("CORS_ORIGINS", "")
-    if not raw.strip():
-        return ["http://localhost:5173", "http://127.0.0.1:5173"]
-    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    raw = os.getenv("CORS_ORIGINS")
+
+    # If explicitly set in environment, use it
+    if raw and raw.strip():
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+    # Production fallback (Render frontend)
+    environment = os.getenv("ENVIRONMENT", "development").strip().lower()
+    if environment == "production":
+        return [
+            "https://skydesk-frontend.onrender.com"
+        ]
+
+    # Development fallback
+    return [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ]
 
 
 def _normalize_database_url(url: str | None) -> str | None:
