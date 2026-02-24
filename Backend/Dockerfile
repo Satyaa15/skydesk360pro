@@ -10,10 +10,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
+# Copy from Backend folder explicitly
+COPY Backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy full backend code
+COPY Backend/ .
 
 EXPOSE 8000
 
