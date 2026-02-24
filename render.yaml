@@ -1,0 +1,41 @@
+databases:
+  - name: skydesk360-db
+    databaseName: skydesk_db
+    user: skydesk_user
+    plan: free
+
+services:
+  - type: web
+    name: skydesk360-backend
+    env: docker
+    plan: free
+    rootDir: Backend
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /docs
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 30
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: skydesk360-db
+          property: connectionString
+      - key: CORS_ORIGINS
+        sync: false
+
+  - type: web
+    name: skydesk360-frontend
+    env: docker
+    plan: free
+    rootDir: Frontend
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false

@@ -8,7 +8,8 @@ RUN npm ci
 
 COPY . .
 
-ARG VITE_API_BASE_URL=http://localhost:8000
+# Build with a placeholder; replace it at runtime in the final image.
+ARG VITE_API_BASE_URL=__API_BASE_URL__
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 RUN npm run build
@@ -23,4 +24,6 @@ COPY --from=builder /app/dist ./dist
 
 EXPOSE 4173
 
-CMD ["sh", "-c", "serve -s dist -l ${PORT:-4173}"]
+ENV VITE_API_BASE_URL=http://127.0.0.1:8000
+
+CMD ["sh", "-c", "find dist -type f -name '*.js' -exec sed -i \"s|__API_BASE_URL__|${VITE_API_BASE_URL}|g\" {} + && serve -s dist -l ${PORT:-4173}"]
