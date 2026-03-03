@@ -60,3 +60,27 @@ export const clearAuthSession = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
 };
+
+/* ─── Admin API ─── */
+const authHeaders = () => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${localStorage.getItem('token')}`,
+});
+
+export const fetchAdminStats = async () => {
+  const res = await fetch(`${API_BASE_URL}/admin/stats`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const fetchAdminUsers = async () => {
+  const res = await fetch(`${API_BASE_URL}/admin/users`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const fetchAdminBookings = async () => {
+  const res = await fetch(`${API_BASE_URL}/admin/bookings`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
