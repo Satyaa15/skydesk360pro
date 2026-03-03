@@ -17,7 +17,7 @@ const Home = () => {
   const navigate = useNavigate();
   const [isLoaded, setIsLoaded] = useState(false);
   const isLoggedIn = !!localStorage.getItem('token');
-  const position = [18.552146999436236, 73.77132638120212];
+  const position = [18.5523284, 73.7714723];
 
   // --- VIDEO PLAYER STATE ---
   const videoRef = useRef(null);
@@ -85,12 +85,12 @@ const Home = () => {
             14 Floors Above Ordinary
           </motion.span>
           
-          <h1 className="text-[14vw] md:text-[10vw] font-black leading-[0.8] tracking-tighter uppercase italic">
+          <h1 className="text-[10vw] md:text-[7vw] font-black leading-[0.8] tracking-tighter uppercase italic">
             SKY<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f2fe] to-[#7000ff]">DESK360</span>
           </h1>
 
           <p className="text-gray-400 text-sm md:text-lg max-w-xl mx-auto mt-8 mb-12 font-medium">
-            The world's first AI-integrated premium workspace. Luxury meets logic at Pune's premier altitude.
+            Pune's premier premium coworking space. Luxury meets productivity at the 14th floor altitude.
           </p>
 
           <button
@@ -180,7 +180,7 @@ const Home = () => {
           <div className="glass rounded-[4rem] border border-white/5 overflow-hidden flex flex-col lg:flex-row shadow-2xl">
             <div className="lg:w-1/2 p-20">
               <h2 className="text-5xl font-black mb-8 italic uppercase">The <span className="text-[#00f2fe]">Location.</span></h2>
-              <p className="text-gray-400 mb-12 flex items-center gap-4"><MapPin className="text-[#00f2fe]"/> 14th Floor, Maruti Chowk, Baner, Pune</p>
+              <p className="text-gray-400 mb-12 flex items-start gap-4"><MapPin className="text-[#00f2fe] flex-shrink-0 mt-1"/> 14th Floor, Maruti Millennium Tower, Pune Bangalore Highway Pashan Exit, Baner Annex, Baner, Pune, Maharashtra 411045</p>
               <button className="text-xs font-black uppercase tracking-widest text-[#00f2fe] flex items-center gap-4">Satellite Coordinates <ArrowRight/></button>
             </div>
             <div className="lg:w-1/2 h-[500px] grayscale brightness-50 contrast-125">

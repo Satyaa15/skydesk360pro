@@ -10,10 +10,11 @@ export default function Footer() {
         </div>
         <div className="text-sm space-y-3">
           <h4 className="text-white font-bold uppercase tracking-widest text-[10px]">Office</h4>
-          <p className="text-gray-500 flex items-center gap-2"><MapPin size={14}/> Financial District, NY</p>
+          <p className="text-gray-500 flex items-start gap-2"><MapPin size={14} className="flex-shrink-0 mt-0.5"/> 14th Floor, Maruti Millennium Tower, Pune Bangalore Highway Pashan Exit, Baner Annex, Baner, Pune, Maharashtra 411045</p>
         </div>
         <div className="text-sm space-y-3">
           <h4 className="text-white font-bold uppercase tracking-widest text-[10px]">Contact</h4>
+          <p className="text-gray-500 flex items-center gap-2"><Phone size={14}/> +91 73970 10324</p>
           <p className="text-gray-500 flex items-center gap-2"><Mail size={14}/> hello@skydesk360.com</p>
         </div>
       </div>

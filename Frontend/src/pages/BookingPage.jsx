@@ -70,10 +70,12 @@ const FLOOR_PLAN_SEATS = [
   { id: 'CEO-2', zone: "CEO's Cabin", workspaceType: 'cabin', price: 2200, cx: 210, cy: 370, booked: false },
   { id: 'CEO-3', zone: "CEO's Cabin", workspaceType: 'cabin', price: 2200, cx: 190, cy: 410, booked: false },
 
-  // Director Cabin
-  { id: 'DIR-1', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 310, cy: 370, booked: false },
-  { id: 'DIR-2', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 350, cy: 370, booked: false },
-  { id: 'DIR-3', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 330, cy: 410, booked: false },
+  // Director Cabin (5 seats)
+  { id: 'DIR-1', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 290, cy: 370, booked: false },
+  { id: 'DIR-2', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 320, cy: 370, booked: false },
+  { id: 'DIR-3', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 350, cy: 370, booked: false },
+  { id: 'DIR-4', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 305, cy: 410, booked: false },
+  { id: 'DIR-5', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 335, cy: 410, booked: false },
 
   // Meeting Room
   { id: 'MR-1', zone: '2 Seater Meeting Room', workspaceType: 'meeting_room', price: 900, cx: 450, cy: 370, booked: false },
