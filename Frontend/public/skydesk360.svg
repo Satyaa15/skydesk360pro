@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="64" height="64" rx="14" fill="#0f172a"/>
+  <!-- Building/desk icon -->
+  <path d="M16 46V22l16-8 16 8v24" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Floors -->
+  <line x1="16" y1="30" x2="48" y2="30" stroke="url(#g1)" stroke-width="1.5" opacity="0.5"/>
+  <line x1="16" y1="38" x2="48" y2="38" stroke="url(#g1)" stroke-width="1.5" opacity="0.5"/>
+  <!-- Window/desk dots -->
+  <circle cx="26" cy="26" r="2" fill="#00f2fe"/>
+  <circle cx="38" cy="26" r="2" fill="#00f2fe"/>
+  <circle cx="26" cy="34" r="2" fill="#7c3aed"/>
+  <circle cx="38" cy="34" r="2" fill="#7c3aed"/>
+  <circle cx="26" cy="42" r="2" fill="#00f2fe" opacity="0.7"/>
+  <circle cx="38" cy="42" r="2" fill="#00f2fe" opacity="0.7"/>
+  <!-- 360 arc -->
+  <path d="M20 50 A14 14 0 1 1 44 50" stroke="url(#g1)" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.6"/>
+</svg>
