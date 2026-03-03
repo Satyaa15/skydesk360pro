@@ -22,7 +22,9 @@ def _get_cors_origins() -> list[str]:
     environment = os.getenv("ENVIRONMENT", "development").strip().lower()
     if environment == "production":
         return [
-            "https://skydesk-frontend.onrender.com"
+            "https://skydesk-frontend.onrender.com",
+            "https://skydesk360.com",
+            "https://www.skydesk360.com",
         ]
 
     # Development fallback
