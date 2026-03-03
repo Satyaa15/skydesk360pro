@@ -27,7 +27,7 @@ services:
           name: skydesk360-db
           property: connectionString
       - key: CORS_ORIGINS
-        sync: false
+        value: "https://skydesk-frontend.onrender.com,https://skydesk360.com,https://www.skydesk360.com"
 
   - type: web
     name: skydesk360-frontend

@@ -6,12 +6,14 @@ from app.core.config import settings
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
-# 🔥 Explicit production-safe CORS handling
-origins = settings.CORS_ORIGINS
+# 🔥 Bulletproof CORS — always include production domains
+REQUIRED_ORIGINS = [
+    "https://skydesk360.com",
+    "https://www.skydesk360.com",
+    "https://skydesk-frontend.onrender.com",
+]
 
-# Safety fallback for production if env not set properly
-if settings.ENVIRONMENT == "production" and not origins:
-    origins = ["https://skydesk-frontend.onrender.com"]
+origins = list(set(settings.CORS_ORIGINS + REQUIRED_ORIGINS))
 
 app.add_middleware(
     CORSMiddleware,
