@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Armchair, X, ChevronRight, Users, Building2, BriefcaseBusiness } from 'lucide-react';
+import { Armchair, X, ChevronRight, Users, Building2, BriefcaseBusiness, ZoomIn, ZoomOut, RotateCcw, Box, Layers, Move } from 'lucide-react';
 import './BookingPage.css';
 
+/* ─── Constants ─── */
 const WORKSPACE_LABELS = {
   workstation: 'Workstation',
   cabin: 'Cabin',
@@ -12,284 +13,519 @@ const WORKSPACE_LABELS = {
 };
 
 const WORKSPACE_FILTERS = [
-  { id: 'all', label: 'All Options' },
+  { id: 'all', label: 'All Spaces' },
   { id: 'workstation', label: 'Workstations' },
   { id: 'cabin', label: 'Cabins' },
   { id: 'meeting_room', label: 'Meeting Room' },
   { id: 'conference', label: 'Conference' },
 ];
 
-// Layout blocks recreated from uploaded blueprint (code-only map, no background image).
-const FLOOR_BLOCKS = [
-  { id: 'ws-1', label: 'WORKSTATIONS', x: 13, y: 7, w: 53, h: 11, kind: 'workspace' },
-  { id: 'ws-2', label: 'WORKSTATIONS', x: 13, y: 20, w: 53, h: 11, kind: 'workspace' },
-  { id: 'reception', label: 'RECEPTION AREA', x: 13, y: 35, w: 53, h: 14, kind: 'reception' },
-  { id: 'conf', label: 'CONVERTIBLE 10 SEATER CONFERENCE', x: 69, y: 6, w: 24, h: 52, kind: 'conference' },
-  { id: 'ceo', label: "CEO'S CABIN", x: 13, y: 58, w: 21, h: 32, kind: 'cabin' },
-  { id: 'director', label: "DIRECTOR'S CABIN", x: 36, y: 58, w: 22, h: 32, kind: 'cabin' },
-  { id: 'meeting', label: '2 SEATER MEETING ROOM', x: 60, y: 58, w: 21, h: 18, kind: 'meeting' },
-  { id: 'coffee', label: 'COFFEE', x: 82, y: 58, w: 11, h: 18, kind: 'utility' },
-  { id: 'toilet', label: 'TOILET M/F', x: 60, y: 78, w: 33, h: 12, kind: 'utility' },
-  { id: 'passage', label: "PASSAGE 5' WIDE", x: 4, y: 54, w: 6, h: 36, kind: 'passage' },
-];
+const ZONE_COLORS = {
+  workstation: { fill: 'rgba(56,189,248,0.10)', stroke: '#38bdf8', label: '#38bdf8' },
+  reception: { fill: 'rgba(251,191,36,0.08)', stroke: '#fbbf24', label: '#fbbf24' },
+  conference: { fill: 'rgba(52,211,153,0.10)', stroke: '#34d399', label: '#34d399' },
+  cabin: { fill: 'rgba(168,85,247,0.10)', stroke: '#a855f7', label: '#a855f7' },
+  meeting: { fill: 'rgba(251,191,36,0.10)', stroke: '#fbbf24', label: '#fbbf24' },
+  utility: { fill: 'rgba(148,163,184,0.06)', stroke: '#64748b', label: '#94a3b8' },
+  passage: { fill: 'rgba(148,163,184,0.04)', stroke: '#475569', label: '#64748b' },
+};
 
+/* ─── Seat Data (same business data, refined positions) ─── */
 const FLOOR_PLAN_SEATS = [
-  // Workstations Row A
-  { id: 'WS-A1', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, x: 19.3, y: 15.9, rotation: 0, booked: false },
-  { id: 'WS-A2', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, x: 27.9, y: 15.9, rotation: 0, booked: true },
-  { id: 'WS-A3', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, x: 36.6, y: 15.9, rotation: 0, booked: false },
-  { id: 'WS-A4', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, x: 45.5, y: 15.9, rotation: 0, booked: false },
-  { id: 'WS-A5', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, x: 54.2, y: 15.9, rotation: 0, booked: false },
-  { id: 'WS-A6', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, x: 62.8, y: 15.9, rotation: 0, booked: false },
+  // Workstations Row A (top row)
+  { id: 'WS-A1', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, cx: 178, cy: 98, booked: false },
+  { id: 'WS-A2', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, cx: 218, cy: 98, booked: false },
+  { id: 'WS-A3', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, cx: 258, cy: 98, booked: false },
+  { id: 'WS-A4', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, cx: 298, cy: 98, booked: false },
+  { id: 'WS-A5', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, cx: 338, cy: 98, booked: false },
+  { id: 'WS-A6', zone: 'Workstations Row A', workspaceType: 'workstation', price: 500, cx: 378, cy: 98, booked: false },
 
-  // Workstations Row B
-  { id: 'WS-B1', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, x: 19.3, y: 26.8, rotation: 0, booked: false },
-  { id: 'WS-B2', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, x: 27.9, y: 26.8, rotation: 0, booked: false },
-  { id: 'WS-B3', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, x: 36.6, y: 26.8, rotation: 0, booked: true },
-  { id: 'WS-B4', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, x: 45.5, y: 26.8, rotation: 0, booked: false },
-  { id: 'WS-B5', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, x: 54.2, y: 26.8, rotation: 0, booked: false },
-  { id: 'WS-B6', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, x: 62.8, y: 26.8, rotation: 0, booked: false },
+  // Workstations Row B (second row)
+  { id: 'WS-B1', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, cx: 178, cy: 148, booked: false },
+  { id: 'WS-B2', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, cx: 218, cy: 148, booked: false },
+  { id: 'WS-B3', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, cx: 258, cy: 148, booked: false },
+  { id: 'WS-B4', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, cx: 298, cy: 148, booked: false },
+  { id: 'WS-B5', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, cx: 338, cy: 148, booked: false },
+  { id: 'WS-B6', zone: 'Workstations Row B', workspaceType: 'workstation', price: 500, cx: 378, cy: 148, booked: false },
 
-  // Reception-facing workstations
-  { id: 'WS-R1', zone: 'Reception Workstations', workspaceType: 'workstation', price: 550, x: 38.2, y: 37.8, rotation: 0, booked: true },
-  { id: 'WS-R2', zone: 'Reception Workstations', workspaceType: 'workstation', price: 550, x: 46.6, y: 37.8, rotation: 0, booked: false },
-  { id: 'WS-R3', zone: 'Reception Workstations', workspaceType: 'workstation', price: 550, x: 55, y: 37.8, rotation: 0, booked: false },
+  // Reception facing workstations
+  { id: 'WS-R1', zone: 'Reception Workstations', workspaceType: 'workstation', price: 550, cx: 260, cy: 215, booked: false },
+  { id: 'WS-R2', zone: 'Reception Workstations', workspaceType: 'workstation', price: 550, cx: 310, cy: 215, booked: false },
+  { id: 'WS-R3', zone: 'Reception Workstations', workspaceType: 'workstation', price: 550, cx: 360, cy: 215, booked: false },
 
-  // Convertible conference (10 seater)
-  { id: 'CONF-1', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, x: 72.2, y: 17.2, rotation: 90, booked: false },
-  { id: 'CONF-2', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, x: 84.3, y: 17.2, rotation: 270, booked: false },
-  { id: 'CONF-3', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, x: 72.2, y: 26.2, rotation: 90, booked: false },
-  { id: 'CONF-4', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, x: 84.3, y: 26.2, rotation: 270, booked: true },
-  { id: 'CONF-5', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, x: 72.2, y: 34.9, rotation: 90, booked: false },
-  { id: 'CONF-6', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, x: 84.3, y: 34.9, rotation: 270, booked: false },
-  { id: 'CONF-7', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, x: 72.2, y: 43.7, rotation: 90, booked: false },
-  { id: 'CONF-8', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, x: 84.3, y: 43.7, rotation: 270, booked: false },
-  { id: 'CONF-9', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, x: 72.2, y: 52.5, rotation: 90, booked: false },
-  { id: 'CONF-10', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, x: 84.3, y: 52.5, rotation: 270, booked: false },
+  // Conference Room (right side, 10 seats around table)
+  { id: 'CONF-1', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, cx: 490, cy: 80, booked: false },
+  { id: 'CONF-2', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, cx: 560, cy: 80, booked: false },
+  { id: 'CONF-3', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, cx: 490, cy: 120, booked: false },
+  { id: 'CONF-4', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, cx: 560, cy: 120, booked: false },
+  { id: 'CONF-5', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, cx: 490, cy: 160, booked: false },
+  { id: 'CONF-6', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, cx: 560, cy: 160, booked: false },
+  { id: 'CONF-7', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, cx: 490, cy: 200, booked: false },
+  { id: 'CONF-8', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, cx: 560, cy: 200, booked: false },
+  { id: 'CONF-9', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, cx: 490, cy: 240, booked: false },
+  { id: 'CONF-10', zone: 'Convertible 10 Seater Conference', workspaceType: 'conference', price: 3000, cx: 560, cy: 240, booked: false },
 
-  // CEO cabin
-  { id: 'CEO-1', zone: "CEO's Cabin", workspaceType: 'cabin', price: 2200, x: 22.6, y: 73.3, rotation: 0, booked: false },
-  { id: 'CEO-2', zone: "CEO's Cabin", workspaceType: 'cabin', price: 2200, x: 30.1, y: 73.3, rotation: 0, booked: true },
-  { id: 'CEO-3', zone: "CEO's Cabin", workspaceType: 'cabin', price: 2200, x: 29.7, y: 85.1, rotation: 180, booked: false },
+  // CEO Cabin
+  { id: 'CEO-1', zone: "CEO's Cabin", workspaceType: 'cabin', price: 2200, cx: 170, cy: 370, booked: false },
+  { id: 'CEO-2', zone: "CEO's Cabin", workspaceType: 'cabin', price: 2200, cx: 210, cy: 370, booked: false },
+  { id: 'CEO-3', zone: "CEO's Cabin", workspaceType: 'cabin', price: 2200, cx: 190, cy: 410, booked: false },
 
-  // Director cabin
-  { id: 'DIR-1', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, x: 43.5, y: 73.3, rotation: 0, booked: false },
-  { id: 'DIR-2', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, x: 50.6, y: 73.3, rotation: 0, booked: false },
-  { id: 'DIR-3', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, x: 50.2, y: 84.9, rotation: 180, booked: false },
+  // Director Cabin
+  { id: 'DIR-1', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 310, cy: 370, booked: false },
+  { id: 'DIR-2', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 350, cy: 370, booked: false },
+  { id: 'DIR-3', zone: "Director's Cabin", workspaceType: 'cabin', price: 1800, cx: 330, cy: 410, booked: false },
 
-  // 2-seater meeting room
-  { id: 'MR-1', zone: '2 Seater Meeting Room', workspaceType: 'meeting_room', price: 900, x: 65.4, y: 79, rotation: 330, booked: false },
-  { id: 'MR-2', zone: '2 Seater Meeting Room', workspaceType: 'meeting_room', price: 900, x: 70.4, y: 72.8, rotation: 35, booked: false },
+  // Meeting Room
+  { id: 'MR-1', zone: '2 Seater Meeting Room', workspaceType: 'meeting_room', price: 900, cx: 450, cy: 370, booked: false },
+  { id: 'MR-2', zone: '2 Seater Meeting Room', workspaceType: 'meeting_room', price: 900, cx: 480, cy: 370, booked: false },
 ];
 
-const SeatGlyph = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 11V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4" />
-    <rect x="3" y="11" width="18" height="6" rx="1" />
-    <path d="M6 17v2" />
-    <path d="M18 17v2" />
+
+/* ─── SVG Floor Plan Component ─── */
+const FloorPlanSVG = ({ visibleSeats, isSeatSelected, toggleSeat, hoveredSeat, setHoveredSeat }) => (
+  <svg viewBox="0 0 640 480" className="floor-svg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      {/* Glow filters */}
+      <filter id="glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feFlood floodColor="#00f2fe" floodOpacity="0.6" />
+        <feComposite in2="blur" operator="in" />
+        <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+      </filter>
+      <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="2" result="blur" />
+        <feFlood floodColor="#ef4444" floodOpacity="0.5" />
+        <feComposite in2="blur" operator="in" />
+        <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+      </filter>
+      <filter id="glow-purple" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feFlood floodColor="#a855f7" floodOpacity="0.5" />
+        <feComposite in2="blur" operator="in" />
+        <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+      </filter>
+
+      {/* Grid pattern */}
+      <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(148,163,184,0.06)" strokeWidth="0.5" />
+      </pattern>
+
+      {/* Desk pattern */}
+      <pattern id="deskHatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="4" stroke="rgba(148,163,184,0.08)" strokeWidth="1" />
+      </pattern>
+    </defs>
+
+    {/* Background grid */}
+    <rect width="640" height="480" fill="url(#grid)" />
+
+    {/* ==================== OUTER WALLS ==================== */}
+    <g className="walls-group">
+      {/* Main building outline */}
+      <rect x="60" y="30" width="580" height="440" rx="3" fill="none" stroke="rgba(148,163,184,0.15)" strokeWidth="2" />
+
+      {/* ── TOP SECTION: Workstations Area ── */}
+      <rect x="130" y="50" width="290" height="130" rx="3"
+        fill={ZONE_COLORS.workstation.fill} stroke={ZONE_COLORS.workstation.stroke} strokeWidth="1.2" strokeDasharray="0" className="zone-rect zone-workstation" />
+
+      {/* Workstation desks Row A */}
+      <rect x="155" y="75" width="250" height="8" rx="2" fill="rgba(56,189,248,0.06)" stroke="rgba(56,189,248,0.2)" strokeWidth="0.5" />
+      {/* Workstation desks Row B */}
+      <rect x="155" y="130" width="250" height="8" rx="2" fill="rgba(56,189,248,0.06)" stroke="rgba(56,189,248,0.2)" strokeWidth="0.5" />
+
+      <text x="275" y="66" className="zone-label" fill={ZONE_COLORS.workstation.label}>WORKSTATIONS</text>
+
+      {/* ── RECEPTION AREA ── */}
+      <rect x="130" y="185" width="290" height="55" rx="3"
+        fill={ZONE_COLORS.reception.fill} stroke={ZONE_COLORS.reception.stroke} strokeWidth="1.2" className="zone-rect zone-reception" />
+      {/* Reception desk */}
+      <rect x="155" y="200" width="80" height="25" rx="6" fill="rgba(251,191,36,0.08)" stroke="rgba(251,191,36,0.25)" strokeWidth="0.8" />
+      <text x="195" y="216" className="zone-label-sm" fill={ZONE_COLORS.reception.label}>RECEPTION</text>
+
+      <text x="275" y="200" className="zone-label" fill={ZONE_COLORS.reception.label}>RECEPTION AREA</text>
+
+      {/* ── CONFERENCE ROOM (right side) ── */}
+      <rect x="445" y="50" width="170" height="220" rx="3"
+        fill={ZONE_COLORS.conference.fill} stroke={ZONE_COLORS.conference.stroke} strokeWidth="1.2" className="zone-rect zone-conference" />
+
+      {/* Sliding glass partition markers */}
+      <line x1="445" y1="50" x2="445" y2="68" stroke={ZONE_COLORS.conference.stroke} strokeWidth="2" strokeDasharray="4 2" />
+      <line x1="445" y1="252" x2="445" y2="270" stroke={ZONE_COLORS.conference.stroke} strokeWidth="2" strokeDasharray="4 2" />
+
+      {/* Conference table */}
+      <rect x="505" y="70" width="30" height="190" rx="6" fill="rgba(52,211,153,0.06)" stroke="rgba(52,211,153,0.2)" strokeWidth="0.8" />
+
+      <text x="530" y="62" className="zone-label" fill={ZONE_COLORS.conference.label}>CONFERENCE</text>
+      <text x="530" y="280" className="zone-label-sm" fill={ZONE_COLORS.conference.label}>CONVERTIBLE 10 SEATER</text>
+
+      {/* Sliding glass labels */}
+      <text x="445" y="46" className="zone-label-xs" fill="rgba(52,211,153,0.6)">SLIDING GLASS</text>
+
+      {/* ── PASSAGE ── */}
+      <rect x="62" y="260" width="30" height="200" rx="1"
+        fill={ZONE_COLORS.passage.fill} stroke={ZONE_COLORS.passage.stroke} strokeWidth="0.8" className="zone-rect" />
+      <text x="77" y="360" className="zone-label-vertical" fill={ZONE_COLORS.passage.label} transform="rotate(-90 77 360)">PASSAGE 5' WIDE</text>
+
+      {/* ── ENTRANCE ── */}
+      <g className="entrance-group">
+        <rect x="60" y="270" width="34" height="3" fill="#00f2fe" rx="1" />
+        <text x="77" y="266" className="entrance-label" fill="#00f2fe">ENTRANCE</text>
+        <path d="M 64 273 L 54 283 L 64 293" fill="none" stroke="#00f2fe" strokeWidth="1.5" className="entrance-arrow" />
+      </g>
+
+      {/* ── CEO'S CABIN ── */}
+      <rect x="100" y="310" width="140" height="130" rx="3"
+        fill={ZONE_COLORS.cabin.fill} stroke={ZONE_COLORS.cabin.stroke} strokeWidth="1.2" className="zone-rect zone-cabin" />
+      {/* CEO desk */}
+      <rect x="155" y="350" width="60" height="12" rx="3" fill="rgba(168,85,247,0.06)" stroke="rgba(168,85,247,0.2)" strokeWidth="0.5" />
+      {/* Door arc */}
+      <path d="M 100 310 Q 120 295 140 310" fill="none" stroke="rgba(168,85,247,0.3)" strokeWidth="0.8" strokeDasharray="3 2" />
+      <text x="170" y="328" className="zone-label" fill={ZONE_COLORS.cabin.label}>CEO'S CABIN</text>
+
+      {/* ── DIRECTOR'S CABIN ── */}
+      <rect x="250" y="310" width="160" height="130" rx="3"
+        fill={ZONE_COLORS.cabin.fill} stroke={ZONE_COLORS.cabin.stroke} strokeWidth="1.2" className="zone-rect zone-cabin" />
+      {/* Director desk */}
+      <rect x="300" y="350" width="60" height="12" rx="3" fill="rgba(168,85,247,0.06)" stroke="rgba(168,85,247,0.2)" strokeWidth="0.5" />
+      <path d="M 250 310 Q 270 295 290 310" fill="none" stroke="rgba(168,85,247,0.3)" strokeWidth="0.8" strokeDasharray="3 2" />
+      <text x="330" y="328" className="zone-label" fill={ZONE_COLORS.cabin.label}>DIRECTOR'S CABIN</text>
+
+      {/* ── 2-SEATER MEETING ROOM ── */}
+      <rect x="420" y="310" width="110" height="80" rx="3"
+        fill={ZONE_COLORS.meeting.fill} stroke={ZONE_COLORS.meeting.stroke} strokeWidth="1.2" className="zone-rect zone-meeting" />
+      {/* Meeting table */}
+      <circle cx="465" cy="355" r="18" fill="rgba(251,191,36,0.05)" stroke="rgba(251,191,36,0.2)" strokeWidth="0.8" />
+      <text x="475" y="328" className="zone-label-sm" fill={ZONE_COLORS.meeting.label}>MEETING ROOM</text>
+      <text x="475" y="340" className="zone-label-xs" fill="rgba(251,191,36,0.5)">2 SEATER</text>
+
+      {/* ── COFFEE MACHINE ── */}
+      <rect x="540" y="310" width="80" height="80" rx="3"
+        fill={ZONE_COLORS.utility.fill} stroke={ZONE_COLORS.utility.stroke} strokeWidth="0.8" className="zone-rect" />
+      <text x="580" y="350" className="zone-label-sm" fill={ZONE_COLORS.utility.label}>COFFEE</text>
+      <text x="580" y="362" className="zone-label-xs" fill="rgba(148,163,184,0.5)">MACHINE</text>
+      {/* Coffee machine icon */}
+      <rect x="565" y="370" width="30" height="12" rx="3" fill="rgba(148,163,184,0.06)" stroke="rgba(148,163,184,0.15)" strokeWidth="0.5" />
+
+      {/* ── TOILET ── */}
+      <rect x="420" y="400" width="200" height="60" rx="3"
+        fill={ZONE_COLORS.utility.fill} stroke={ZONE_COLORS.utility.stroke} strokeWidth="0.8" className="zone-rect" />
+      <text x="520" y="434" className="zone-label" fill={ZONE_COLORS.utility.label}>TOILET M/F</text>
+      {/* Toilet fixtures */}
+      <circle cx="480" cy="435" r="8" fill="none" stroke="rgba(148,163,184,0.12)" strokeWidth="0.5" />
+      <circle cx="540" cy="435" r="8" fill="none" stroke="rgba(148,163,184,0.12)" strokeWidth="0.5" />
+    </g>
+
+    {/* ── Dimension lines ── */}
+    <g className="dimensions-group" opacity="0.3">
+      <line x1="60" y1="475" x2="640" y2="475" stroke="#64748b" strokeWidth="0.5" strokeDasharray="2 3" />
+      <text x="350" y="473" fill="#64748b" fontSize="6" textAnchor="middle" fontFamily="Inter">32'-4"</text>
+
+      <line x1="635" y1="30" x2="635" y2="470" stroke="#64748b" strokeWidth="0.5" strokeDasharray="2 3" />
+      <text x="632" y="250" fill="#64748b" fontSize="6" textAnchor="end" fontFamily="Inter" transform="rotate(-90 632 250)">39'-9"</text>
+    </g>
+
+    {/* ==================== SEAT MARKERS (Office Chair Icons) ==================== */}
+    {visibleSeats.map((seat) => {
+      const selected = isSeatSelected(seat.id);
+      const isHovered = hoveredSeat === seat.id;
+      const seatClass = seat.booked ? 'seat-marker booked' : selected ? 'seat-marker selected' : 'seat-marker available';
+      const cx = seat.cx;
+      const cy = seat.cy;
+
+      return (
+        <g key={seat.id} className={seatClass}
+          onMouseEnter={() => setHoveredSeat(seat.id)}
+          onMouseLeave={() => setHoveredSeat(null)}
+          onClick={(e) => { e.stopPropagation(); if (!seat.booked) toggleSeat(seat); }}
+          style={{ cursor: seat.booked ? 'not-allowed' : 'pointer' }}
+        >
+          {/* Selected glow background */}
+          {selected && (
+            <circle cx={cx} cy={cy} r="15" className="seat-glow-ring" />
+          )}
+
+          {/* ── Office Chair SVG ── */}
+          {/* Chair backrest (curved top) */}
+          <path
+            d={`M ${cx-7} ${cy-4} Q ${cx-8} ${cy-11} ${cx-4} ${cy-13} Q ${cx} ${cy-15} ${cx+4} ${cy-13} Q ${cx+8} ${cy-11} ${cx+7} ${cy-4}`}
+            className="chair-backrest"
+            filter={selected ? 'url(#glow-cyan)' : seat.booked ? 'url(#glow-red)' : undefined}
+          />
+          {/* Chair seat pad */}
+          <rect x={cx-8} y={cy-4} width="16" height="7" rx="2" className="chair-seat" />
+          {/* Left armrest */}
+          <line x1={cx-9} y1={cy-4} x2={cx-9} y2={cy+2} className="chair-arm" />
+          <line x1={cx-9} y1={cy-4} x2={cx-6} y2={cy-4} className="chair-arm" />
+          {/* Right armrest */}
+          <line x1={cx+9} y1={cy-4} x2={cx+9} y2={cy+2} className="chair-arm" />
+          <line x1={cx+9} y1={cy-4} x2={cx+6} y2={cy-4} className="chair-arm" />
+          {/* Center pole */}
+          <line x1={cx} y1={cy+3} x2={cx} y2={cy+7} className="chair-pole" />
+          {/* Base star (5-point) */}
+          <line x1={cx-6} y1={cy+9} x2={cx+6} y2={cy+9} className="chair-base" />
+          <line x1={cx-5} y1={cy+9} x2={cx-7} y2={cy+11} className="chair-base" />
+          <line x1={cx+5} y1={cy+9} x2={cx+7} y2={cy+11} className="chair-base" />
+          <line x1={cx} y1={cy+7} x2={cx} y2={cy+9} className="chair-base" />
+          {/* Wheels (small circles) */}
+          <circle cx={cx-7} cy={cy+11} r="1.2" className="chair-wheel" />
+          <circle cx={cx+7} cy={cy+11} r="1.2" className="chair-wheel" />
+          <circle cx={cx} cy={cy+9} r="1" className="chair-wheel" />
+
+          {/* Seat label */}
+          <text x={cx} y={cy + 20} className="seat-label-svg">
+            {seat.id}
+          </text>
+
+          {/* Hover tooltip */}
+          {isHovered && !seat.booked && (
+            <g className="seat-tooltip-group">
+              <rect x={cx - 55} y={cy - 32} width="110" height="34" rx="6"
+                fill="rgba(15,23,42,0.95)" stroke="rgba(0,242,254,0.3)" strokeWidth="0.8" />
+              <text x={cx} y={cy - 19} className="tooltip-title">{seat.id} — {seat.zone}</text>
+              <text x={cx} y={cy - 7} className="tooltip-price">₹{seat.price.toLocaleString()}/mo</text>
+            </g>
+          )}
+          {isHovered && seat.booked && (
+            <g className="seat-tooltip-group">
+              <rect x={cx - 30} y={cy - 30} width="60" height="20" rx="5"
+                fill="rgba(127,29,29,0.92)" stroke="rgba(239,68,68,0.3)" strokeWidth="0.8" />
+              <text x={cx} y={cx - 16} className="tooltip-booked">BOOKED</text>
+            </g>
+          )}
+        </g>
+      );
+    })}
   </svg>
 );
 
+
+/* ─── Main Component ─── */
 const BookingPage = () => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedSeats, setSelectedSeats] = useState([]);
+  const [viewMode, setViewMode] = useState('2d'); // '2d' | '3d'
+  const [hoveredSeat, setHoveredSeat] = useState(null);
+
+  // Zoom (no drag-to-pan — it interferes with seat clicks)
+  const [zoom, setZoom] = useState(1);
+  const mapRef = useRef(null);
 
   const visibleSeats = useMemo(() => {
-    if (activeFilter === 'all') {
-      return FLOOR_PLAN_SEATS;
-    }
-    return FLOOR_PLAN_SEATS.filter((seat) => seat.workspaceType === activeFilter);
+    if (activeFilter === 'all') return FLOOR_PLAN_SEATS;
+    return FLOOR_PLAN_SEATS.filter((s) => s.workspaceType === activeFilter);
   }, [activeFilter]);
 
   const workspaceStats = useMemo(() => {
     const seatTotal = FLOOR_PLAN_SEATS.length;
-    const availableSeats = FLOOR_PLAN_SEATS.filter((seat) => !seat.booked).length;
-
+    const availableSeats = FLOOR_PLAN_SEATS.filter((s) => !s.booked).length;
     return { seatTotal, availableSeats };
   }, []);
 
-  const toggleSeat = (seat) => {
-    setSelectedSeats((previous) => {
-      const exists = previous.find((selected) => selected.id === seat.id);
-      if (exists) {
-        return previous.filter((selected) => selected.id !== seat.id);
-      }
-      return [...previous, seat];
+  const toggleSeat = useCallback((seat) => {
+    setSelectedSeats((prev) => {
+      const exists = prev.find((s) => s.id === seat.id);
+      return exists ? prev.filter((s) => s.id !== seat.id) : [...prev, seat];
     });
-  };
+  }, []);
 
-  const removeSeat = (seatId) => {
-    setSelectedSeats((previous) => previous.filter((seat) => seat.id !== seatId));
-  };
-
-  const isSeatSelected = (seatId) => selectedSeats.some((seat) => seat.id === seatId);
-
-  const totalPrice = useMemo(() => selectedSeats.reduce((sum, seat) => sum + seat.price, 0), [selectedSeats]);
-
-  const selectionBreakdown = useMemo(
-    () =>
-      selectedSeats.reduce((accumulator, seat) => {
-        const key = seat.workspaceType;
-        accumulator[key] = (accumulator[key] || 0) + 1;
-        return accumulator;
-      }, {}),
+  const removeSeat = (seatId) => setSelectedSeats((prev) => prev.filter((s) => s.id !== seatId));
+  const isSeatSelected = useCallback((seatId) => selectedSeats.some((s) => s.id === seatId), [selectedSeats]);
+  const totalPrice = useMemo(() => selectedSeats.reduce((sum, s) => sum + s.price, 0), [selectedSeats]);
+  const selectionBreakdown = useMemo(() =>
+    selectedSeats.reduce((acc, s) => { acc[s.workspaceType] = (acc[s.workspaceType] || 0) + 1; return acc; }, {}),
     [selectedSeats]
   );
 
   const handleProceed = () => {
     navigate('/payment', {
-      state: {
-        seats: selectedSeats,
-        total: totalPrice,
-        floor: '14th Floor - SkyDesk360 Baner Layout',
-      },
+      state: { seats: selectedSeats, total: totalPrice, floor: '14th Floor - SkyDesk360 Baner Layout' },
     });
   };
 
+  /* Zoom controls */
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.25, 3));
+  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
+  const handleResetView = () => setZoom(1);
+
+  /* Mouse wheel zoom */
+  const handleWheel = useCallback((e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoom((z) => Math.min(Math.max(z + delta, 0.5), 3));
+  }, []);
+
+  useEffect(() => {
+    const el = mapRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
+
   return (
-    <div className="booking-page">
-      <div className="booking-header">
-        <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          Blueprint <span>Booking</span>
-        </motion.h1>
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}>
-          Full floor converted to code layout
-        </motion.p>
+    <div className="bp-page">
+      {/* ─── Ambient background effects ─── */}
+      <div className="bp-ambient-glow bp-glow-1" />
+      <div className="bp-ambient-glow bp-glow-2" />
+
+      {/* ─── Header ─── */}
+      <div className="bp-header">
+        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="bp-header-inner">
+          <span className="bp-header-badge">PREMIUM WORKSPACE</span>
+          <h1 className="bp-title">
+            Floor <span className="bp-title-accent">Blueprint</span>
+          </h1>
+          <p className="bp-subtitle">Interactive 2D & 3D seat selection • 14th Floor, Baner</p>
+        </motion.div>
       </div>
 
-      <div className="workspace-filters">
-        {WORKSPACE_FILTERS.map((filter) => (
-          <button
-            key={filter.id}
-            className={`workspace-btn ${activeFilter === filter.id ? 'active' : ''}`}
-            onClick={() => setActiveFilter(filter.id)}
-          >
-            {filter.label}
+      {/* ─── Filters ─── */}
+      <div className="bp-filters">
+        {WORKSPACE_FILTERS.map((f) => (
+          <button key={f.id} className={`bp-filter-btn ${activeFilter === f.id ? 'active' : ''}`} onClick={() => setActiveFilter(f.id)}>
+            {f.label}
           </button>
         ))}
       </div>
 
-      <div className="floor-meta">
-        <span>
-          <Users size={13} /> {workspaceStats.availableSeats} available / {workspaceStats.seatTotal} total
-        </span>
-        <span>
-          <BriefcaseBusiness size={13} /> Code-drawn blueprint map
-        </span>
-        <span>
-          <Building2 size={13} /> Workstation + Cabin + Meeting + Conference
-        </span>
+      {/* ─── Stats bar ─── */}
+      <div className="bp-stats">
+        <span className="bp-stat"><Users size={13} /> {workspaceStats.availableSeats} available / {workspaceStats.seatTotal} total</span>
+        <span className="bp-stat"><BriefcaseBusiness size={13} /> SVG precision floor plan</span>
+        <span className="bp-stat"><Building2 size={13} /> 4 workspace categories</span>
       </div>
 
-      <div className="booking-container">
-        <div className="floor-plan-wrapper">
-          <div className="blueprint-shell">
-            <div className="blueprint-toolbar">Click seats directly on the coded floor map</div>
-
-            <div className="blueprint-canvas">
-              <div className="plan-grid-overlay" />
-
-              {FLOOR_BLOCKS.map((block) => (
-                <div
-                  key={block.id}
-                  className={`plan-block ${block.kind}`}
-                  style={{ left: `${block.x}%`, top: `${block.y}%`, width: `${block.w}%`, height: `${block.h}%` }}
-                >
-                  <span>{block.label}</span>
-                </div>
-              ))}
-
-              <div className="plan-entrance">ENTRANCE</div>
-
-              {visibleSeats.map((seat) => (
-                <div key={seat.id} className="seat-pin-wrap" style={{ left: `${seat.x}%`, top: `${seat.y}%` }}>
-                  <button
-                    className={`seat-pin ${seat.workspaceType} ${seat.booked ? 'booked' : ''} ${isSeatSelected(seat.id) ? 'selected' : ''}`}
-                    style={{ '--seat-rotation': `${seat.rotation ?? 0}deg` }}
-                    onClick={() => !seat.booked && toggleSeat(seat)}
-                    disabled={seat.booked}
-                    title={seat.booked ? 'Already booked' : `${seat.id} - Rs ${seat.price}`}
-                  >
-                    <SeatGlyph />
-                  </button>
-                  <span className="seat-pin-label">{seat.id}</span>
-                </div>
-              ))}
+      {/* ─── Main Container ─── */}
+      <div className="bp-container">
+        {/* ─── Map Section ─── */}
+        <div className="bp-map-section">
+          {/* Toolbar */}
+          <div className="bp-toolbar">
+            <div className="bp-toolbar-left">
+              <span className="bp-toolbar-title">Floor Map</span>
+              <span className="bp-toolbar-hint">Click seats to select • Scroll to zoom</span>
+            </div>
+            <div className="bp-toolbar-controls">
+              <button className={`bp-view-btn ${viewMode === '2d' ? 'active' : ''}`} onClick={() => setViewMode('2d')} title="2D View">
+                <Layers size={14} /> 2D
+              </button>
+              <button className={`bp-view-btn ${viewMode === '3d' ? 'active' : ''}`} onClick={() => setViewMode('3d')} title="3D View">
+                <Box size={14} /> 3D
+              </button>
+              <div className="bp-toolbar-divider" />
+              <button className="bp-zoom-btn" onClick={handleZoomIn} title="Zoom In"><ZoomIn size={14} /></button>
+              <button className="bp-zoom-btn" onClick={handleZoomOut} title="Zoom Out"><ZoomOut size={14} /></button>
+              <button className="bp-zoom-btn" onClick={handleResetView} title="Reset View"><RotateCcw size={14} /></button>
+              <span className="bp-zoom-level">{Math.round(zoom * 100)}%</span>
             </div>
           </div>
 
-          <div className="legend blueprint-legend">
-            <div className="legend-item">
-              <div className="legend-dot available" />
-              <span className="legend-label">Available</span>
+          {/* Map canvas */}
+          <div className="bp-map-canvas-wrapper" ref={mapRef}>
+            <div className={`bp-map-transform ${viewMode === '3d' ? 'bp-3d-active' : ''}`}
+              style={{ transform: `scale(${zoom})` }}
+            >
+              <FloorPlanSVG
+                visibleSeats={visibleSeats}
+                isSeatSelected={isSeatSelected}
+                toggleSeat={toggleSeat}
+                hoveredSeat={hoveredSeat}
+                setHoveredSeat={setHoveredSeat}
+              />
             </div>
-            <div className="legend-item">
-              <div className="legend-dot selected-legend" />
-              <span className="legend-label">Selected</span>
+          </div>
+
+          {/* Legend */}
+          <div className="bp-legend">
+            <div className="bp-legend-item">
+              <div className="bp-legend-dot available" />
+              <span>Available</span>
             </div>
-            <div className="legend-item">
-              <div className="legend-dot booked-legend" />
-              <span className="legend-label">Booked</span>
+            <div className="bp-legend-item">
+              <div className="bp-legend-dot selected" />
+              <span>Selected</span>
+            </div>
+            <div className="bp-legend-item">
+              <div className="bp-legend-dot booked" />
+              <span>Booked</span>
+            </div>
+            <div className="bp-legend-sep" />
+            <div className="bp-legend-item">
+              <div className="bp-legend-swatch" style={{ background: ZONE_COLORS.workstation.stroke }} />
+              <span>Workstation</span>
+            </div>
+            <div className="bp-legend-item">
+              <div className="bp-legend-swatch" style={{ background: ZONE_COLORS.cabin.stroke }} />
+              <span>Cabin</span>
+            </div>
+            <div className="bp-legend-item">
+              <div className="bp-legend-swatch" style={{ background: ZONE_COLORS.conference.stroke }} />
+              <span>Conference</span>
+            </div>
+            <div className="bp-legend-item">
+              <div className="bp-legend-swatch" style={{ background: ZONE_COLORS.meeting.stroke }} />
+              <span>Meeting</span>
             </div>
           </div>
         </div>
 
-        <div className="booking-sidebar">
-          <div className="summary-card">
-            <h3 className="summary-title">Booking Summary</h3>
+        {/* ─── Sidebar ─── */}
+        <div className="bp-sidebar">
+          <div className="bp-summary-card">
+            <div className="bp-summary-accent" />
+            <h3 className="bp-summary-title">Booking Summary</h3>
 
             {selectedSeats.length === 0 ? (
-              <div className="empty-state">
-                <Armchair className="empty-icon" />
-                <p className="empty-text">Select seats directly on the coded blueprint map to continue.</p>
+              <div className="bp-empty-state">
+                <div className="bp-empty-icon-wrap">
+                  <Armchair className="bp-empty-icon" />
+                </div>
+                <p className="bp-empty-text">Select seats on the interactive floor map to build your booking.</p>
               </div>
             ) : (
               <>
-                <div className="selected-seats-list">
+                <div className="bp-seats-list">
                   <AnimatePresence>
                     {selectedSeats.map((seat) => (
                       <motion.div
                         key={seat.id}
-                        initial={{ opacity: 0, x: -10 }}
+                        initial={{ opacity: 0, x: -16 }}
                         animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 10 }}
-                        className="selected-seat-item"
+                        exit={{ opacity: 0, x: 16 }}
+                        className="bp-seat-row"
                       >
-                        <div className="seat-info">
-                          <span className="seat-info-name">{seat.id}</span>
-                          <span className="seat-info-zone">{seat.zone}</span>
-                          <span className="seat-info-type">{WORKSPACE_LABELS[seat.workspaceType]}</span>
+                        <div className="bp-seat-info">
+                          <span className="bp-seat-name">{seat.id}</span>
+                          <span className="bp-seat-zone">{seat.zone}</span>
+                          <span className="bp-seat-type">{WORKSPACE_LABELS[seat.workspaceType]}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <span className="seat-info-price">Rs {seat.price.toLocaleString()}</span>
-                          <button className="remove-seat-btn" onClick={() => removeSeat(seat.id)} title="Remove seat">
-                            <X size={14} />
-                          </button>
+                        <div className="bp-seat-actions">
+                          <span className="bp-seat-price">₹{seat.price.toLocaleString()}</span>
+                          <button className="bp-remove-btn" onClick={() => removeSeat(seat.id)} title="Remove"><X size={13} /></button>
                         </div>
                       </motion.div>
                     ))}
                   </AnimatePresence>
                 </div>
 
-                <div className="summary-divider" />
+                <div className="bp-divider" />
 
-                <div className="selection-breakdown">
+                <div className="bp-breakdown">
                   {Object.entries(selectionBreakdown).map(([type, count]) => (
-                    <span key={type}>{WORKSPACE_LABELS[type]}: {count}</span>
+                    <span key={type} className="bp-breakdown-chip">{WORKSPACE_LABELS[type]}: {count}</span>
                   ))}
                 </div>
 
-                <div className="summary-total">
-                  <span className="total-label">Total</span>
-                  <span className="total-amount">Rs {totalPrice.toLocaleString()}</span>
+                <div className="bp-total-row">
+                  <span className="bp-total-label">Total</span>
+                  <span className="bp-total-amount">₹{totalPrice.toLocaleString()}</span>
                 </div>
               </>
             )}
 
-            <button className="proceed-btn" disabled={selectedSeats.length === 0} onClick={handleProceed}>
-              Proceed to Payment <ChevronRight size={16} style={{ display: 'inline', verticalAlign: 'middle' }} />
+            <button className="bp-proceed-btn" disabled={selectedSeats.length === 0} onClick={handleProceed}>
+              <span className="bp-proceed-text">Proceed to Payment</span>
+              <ChevronRight size={16} />
             </button>
           </div>
         </div>
