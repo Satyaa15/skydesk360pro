@@ -521,41 +521,37 @@ const Home = () => {
               <TiltCard>
                 <div style={{
                   width: '280px', aspectRatio: '9/18.5',
-                  background: '#0a0a14', borderRadius: '48px',
+                  background: 'linear-gradient(160deg, #0a0a14 0%, #0f172a 100%)', borderRadius: '48px',
                   border: '10px solid rgba(255,255,255,0.06)',
                   boxShadow: '0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
                   overflow: 'hidden', position: 'relative',
-                }} className="group">
-                  <video ref={videoRef} onTimeUpdate={handleTimeUpdate} playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }}>
-                    <source src="/videos/office-tour.mp4" type="video/mp4" />
-                  </video>
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: '1.25rem',
+                }}>
+                  {/* Ambient orbs */}
+                  <div style={{ position: 'absolute', top: '20%', left: '10%', width: '140px', height: '140px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(249,115,22,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
+                  <div style={{ position: 'absolute', bottom: '20%', right: '5%', width: '100px', height: '100px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+                  {/* Play icon */}
                   <div style={{
-                    position: 'absolute', inset: 0,
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, transparent 50%)',
-                    opacity: 0, transition: 'opacity 0.3s',
-                    display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '1.5rem',
-                  }} className="group-hover:opacity-100">
-                    <div style={{ height: '3px', background: 'rgba(255,255,255,0.15)', borderRadius: '999px', marginBottom: '1.5rem', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', background: '#00f2fe', width: `${videoProgress}%`, transition: 'width 0.3s' }} />
+                    width: '64px', height: '64px', borderRadius: '50%',
+                    background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.3)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Play size={28} color="#f97316" fill="#f97316" style={{ marginLeft: '3px' }} />
+                  </div>
+
+                  {/* Text */}
+                  <div style={{ textAlign: 'center', padding: '0 1.5rem' }}>
+                    <p style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.25em', color: '#f97316', marginBottom: '0.5rem' }}>Virtual Tour</p>
+                    <p style={{ fontSize: '0.7rem', color: '#334155', fontWeight: 600, lineHeight: 1.5 }}>Office walkthrough coming soon</p>
+                  </div>
+
+                  {/* Fake progress bar */}
+                  <div style={{ position: 'absolute', bottom: '2.5rem', left: '1.5rem', right: '1.5rem' }}>
+                    <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: '35%', background: 'linear-gradient(90deg, #f97316, #a855f7)', borderRadius: '999px' }} />
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                      <button onClick={() => skip(-5)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff' }}><Rewind size={20} /></button>
-                      <button onClick={togglePlay} style={{
-                        width: '52px', height: '52px', borderRadius: '50%',
-                        background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-                      }}>
-                        {isPlaying ? <Pause size={20} fill="white" /> : <Play size={20} fill="white" style={{ marginLeft: '2px' }} />}
-                      </button>
-                      <button onClick={() => skip(5)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff' }}><FastForward size={20} /></button>
-                    </div>
-                    <button onClick={() => { if (videoRef.current) videoRef.current.currentTime = 0; }} style={{
-                      background: 'none', border: 'none', cursor: 'pointer', color: '#475569',
-                      fontSize: '0.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                    }}>
-                      <RotateCcw size={10} /> Restart
-                    </button>
                   </div>
                 </div>
               </TiltCard>

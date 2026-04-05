@@ -1,9 +1,3 @@
-databases:
-  - name: skydesk360-db
-    databaseName: skydesk_db
-    user: skydesk_user
-    plan: free
-
 services:
   - type: web
     name: skydesk360-backend
@@ -23,9 +17,9 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: skydesk360-db
-          property: connectionString
+        sync: false
+        # REQUIRED: Set this in Render dashboard to your Neon connection string
+        # e.g. postgresql://user:pass@ep-xxx.us-east-1.aws.neon.tech/skydesk_db?sslmode=require
       - key: CORS_ORIGINS
         value: "https://skydesk-frontend.onrender.com,https://skydesk360.com,https://www.skydesk360.com"
       - key: RAZORPAY_KEY_ID

@@ -11,6 +11,7 @@ engine = create_engine(
     settings.DATABASE_URL,
     echo=settings.SQL_ECHO,
     pool_pre_ping=True,
+    connect_args={"sslmode": "require"} if "neon.tech" in (settings.DATABASE_URL or "") else {},
 )
 
 
