@@ -1,5 +1,23 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
+/**
+ * Ping the backend health endpoint.
+ * Render free-tier services sleep after inactivity; the first request returns 502.
+ * This retries up to `maxAttempts` times with a delay, returning true when alive.
+ */
+export const wakeBackend = async (maxAttempts = 8, delayMs = 4000) => {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/`, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) return true;
+    } catch {
+      // network error or timeout — server still waking up
+    }
+    if (i < maxAttempts - 1) await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return false;
+};
+
 const parseError = async (response) => {
   try {
     const data = await response.json();

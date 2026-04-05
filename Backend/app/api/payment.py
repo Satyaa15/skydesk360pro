@@ -105,7 +105,7 @@ def create_order(
     if booking.razorpay_order_id:
         seat = session.get(Seat, booking.seat_id)
         booking_amount = booking.price_amount or compute_amount(
-            seat.price if seat else 0, booking.duration_unit, booking.duration_quantity
+            seat.type if seat else "workstation", booking.duration_unit, booking.duration_quantity
         )
         return CreateOrderResponse(
             razorpay_order_id=booking.razorpay_order_id,
@@ -121,7 +121,7 @@ def create_order(
 
     client = _get_razorpay_client()
     booking_amount = booking.price_amount or compute_amount(
-        seat.price, booking.duration_unit, booking.duration_quantity
+        seat.type, booking.duration_unit, booking.duration_quantity
     )
     amount_paise = to_paise(booking_amount)
 
@@ -218,7 +218,7 @@ def create_order_batch(
     total_amount = 0.0
     for seat_id in body.seat_ids:
         seat = seat_map[seat_id]
-        seat_amount = compute_amount(seat.price, body.duration_unit, body.duration_quantity)
+        seat_amount = compute_amount(seat.type, body.duration_unit, body.duration_quantity)
         total_amount += seat_amount
         booking = Booking(
             user_id=current_user.id,
@@ -345,7 +345,7 @@ def verify_payment(
         booking.end_time = compute_end_time(now, booking.duration_unit, booking.duration_quantity)
 
         payment_amount = booking.price_amount or compute_amount(
-            seat.price, booking.duration_unit, booking.duration_quantity
+            seat.type, booking.duration_unit, booking.duration_quantity
         )
         payment = Payment(
             booking_id=booking.id,
@@ -365,7 +365,7 @@ def verify_payment(
             if not seat:
                 continue
             amount = booking.price_amount or compute_amount(
-                seat.price, booking.duration_unit, booking.duration_quantity
+                seat.type, booking.duration_unit, booking.duration_quantity
             )
             send_booking_email(
                 current_user.email,
@@ -446,7 +446,7 @@ async def razorpay_webhook(request: Request, session: Session = Depends(get_sess
             ).first()
             if not existing_payment:
                 amount = booking.price_amount or compute_amount(
-                    seat.price if seat else 0, booking.duration_unit, booking.duration_quantity
+                    seat.type if seat else "workstation", booking.duration_unit, booking.duration_quantity
                 )
                 session.add(Payment(
                     booking_id=booking.id,

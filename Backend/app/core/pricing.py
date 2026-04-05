@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
-
-from app.models.models import BookingDuration
 from datetime import datetime, timedelta
 
-_DAYS_PER_MONTH = Decimal("30")
-_HOURS_PER_DAY = Decimal("24")
+from app.models.models import BookingDuration
+
+# ── Official rate card ───────────────────────────────────────────────────────
+# All amounts in INR.  Yearly = monthly × 12 × 10% discount.
+SEAT_PRICES: dict[str, dict[str, float]] = {
+    "workstation": {"hourly": 100.0,  "daily": 400.0,   "monthly": 7_000.0},
+    "cabin":       {"hourly": 400.0,  "daily": 2_500.0,  "monthly": 35_000.0},
+    "conference":  {"hourly": 550.0,  "daily": 4_500.0,  "monthly": 60_000.0},
+    "meeting_room":{"hourly": 550.0,  "daily": 4_500.0,  "monthly": 60_000.0},
+}
+_DEFAULT_TYPE = "workstation"
 _YEARLY_DISCOUNT = Decimal("0.90")
 
 
@@ -14,19 +21,21 @@ def _to_decimal(value: float | int | str) -> Decimal:
     return Decimal(str(value))
 
 
-def compute_amount(base_monthly_price: float, duration_unit: BookingDuration, quantity: int = 1) -> float:
-    base = _to_decimal(base_monthly_price)
-    if duration_unit == BookingDuration.HOURLY:
-        amount = base / _DAYS_PER_MONTH / _HOURS_PER_DAY
-    elif duration_unit == BookingDuration.DAILY:
-        amount = base / _DAYS_PER_MONTH
-    elif duration_unit == BookingDuration.YEARLY:
-        amount = base * Decimal("12") * _YEARLY_DISCOUNT
-    else:
-        amount = base
+def compute_amount(seat_type: str, duration_unit: BookingDuration, quantity: int = 1) -> float:
+    """Return the total booking amount for the given seat type, duration, and quantity."""
+    prices = SEAT_PRICES.get(seat_type, SEAT_PRICES[_DEFAULT_TYPE])
 
-    amount = amount * _to_decimal(quantity)
-    return float(amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    if duration_unit == BookingDuration.HOURLY:
+        rate = _to_decimal(prices["hourly"])
+    elif duration_unit == BookingDuration.DAILY:
+        rate = _to_decimal(prices["daily"])
+    elif duration_unit == BookingDuration.YEARLY:
+        rate = _to_decimal(prices["monthly"]) * Decimal("12") * _YEARLY_DISCOUNT
+    else:  # MONTHLY (default)
+        rate = _to_decimal(prices["monthly"])
+
+    total = rate * _to_decimal(quantity)
+    return float(total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 def to_paise(amount: float) -> int:

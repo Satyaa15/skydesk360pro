@@ -74,7 +74,7 @@ def create_booking(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seat has already been booked")
     
     # Create pending booking
-    booking_amount = compute_amount(seat.price, body.duration_unit, body.duration_quantity)
+    booking_amount = compute_amount(seat.type, body.duration_unit, body.duration_quantity)
     booking = Booking(
         user_id=current_user.id,
         seat_id=seat_id,

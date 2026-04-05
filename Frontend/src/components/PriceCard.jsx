@@ -3,7 +3,15 @@ import { motion } from 'framer-motion';
 import { Check, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export default function PriceCard({ title, price, unit = 'session', features = [], highlight, accent = '#00f2fe' }) {
+/**
+ * props:
+ *   title    — "Dedicated Desk" | "Private Cabin" | "Conference Room"
+ *   prices   — { hourly: '100', daily: '400', monthly: '7,000' }
+ *   features — string[]
+ *   highlight — bool (most-popular styling)
+ *   accent   — CSS color string
+ */
+export default function PriceCard({ title, prices, features = [], highlight, accent = '#00f2fe' }) {
   const ref = useRef(null);
   const navigate = useNavigate();
 
@@ -16,8 +24,15 @@ export default function PriceCard({ title, price, unit = 'session', features = [
     el.style.transform = `perspective(1000px) rotateY(${x * 12}deg) rotateX(${-y * 12}deg) scale3d(1.015,1.015,1.015)`;
   };
   const handleLeave = () => {
-    if (ref.current) ref.current.style.transform = 'perspective(1000px) rotateY(0deg) rotateX(0deg) scale3d(1,1,1)';
+    if (ref.current)
+      ref.current.style.transform = 'perspective(1000px) rotateY(0deg) rotateX(0deg) scale3d(1,1,1)';
   };
+
+  const rows = [
+    { label: '/ hour', value: prices.hourly },
+    { label: '/ day',  value: prices.daily  },
+    { label: '/ month', value: prices.monthly },
+  ];
 
   return (
     <motion.div
@@ -42,7 +57,7 @@ export default function PriceCard({ title, price, unit = 'session', features = [
         }}
       >
         <div style={{
-          background: highlight ? 'rgba(10,10,20,0.95)' : 'rgba(15,23,42,0.6)',
+          background: highlight ? 'rgba(10,10,20,0.97)' : 'rgba(15,23,42,0.6)',
           borderRadius: '22px',
           padding: '2.25rem',
           backdropFilter: 'blur(24px)',
@@ -63,8 +78,8 @@ export default function PriceCard({ title, price, unit = 'session', features = [
           {highlight && (
             <div style={{
               position: 'absolute', top: '-40px', right: '-40px',
-              width: '160px', height: '160px', borderRadius: '50%',
-              background: `radial-gradient(circle, ${accent}12 0%, transparent 70%)`,
+              width: '180px', height: '180px', borderRadius: '50%',
+              background: `radial-gradient(circle, ${accent}10 0%, transparent 70%)`,
               pointerEvents: 'none',
             }} />
           )}
@@ -76,7 +91,7 @@ export default function PriceCard({ title, price, unit = 'session', features = [
               fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase',
               letterSpacing: '0.2em', color: '#000',
               background: `linear-gradient(135deg, ${accent}, #00f2fe)`,
-              padding: '0.3rem 0.7rem', borderRadius: '999px',
+              padding: '0.3rem 0.75rem', borderRadius: '999px',
             }}>
               Popular
             </div>
@@ -85,38 +100,68 @@ export default function PriceCard({ title, price, unit = 'session', features = [
           {/* Title */}
           <p style={{
             fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase',
-            letterSpacing: '0.3em', color: '#334155', marginBottom: '1.25rem',
+            letterSpacing: '0.3em', color: '#334155', marginBottom: '1.5rem',
           }}>
             {title}
           </p>
 
-          {/* Price */}
-          <div style={{ marginBottom: '1.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.2rem' }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: accent, alignSelf: 'flex-start', marginTop: '0.4rem' }}>₹</span>
-              <span style={{
-                fontSize: '3.2rem', fontWeight: 900, fontStyle: 'italic', lineHeight: 1,
-                background: highlight ? `linear-gradient(135deg, ${accent}, #fff)` : `linear-gradient(135deg, #fff, #94a3b8)`,
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-              }}>
-                {price}
-              </span>
-              <span style={{ fontSize: '0.72rem', color: '#334155', fontWeight: 600 }}>/{unit}</span>
-            </div>
+          {/* Rate table */}
+          <div style={{ marginBottom: '1.75rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {rows.map(({ label, value }, i) => (
+              <div
+                key={label}
+                style={{
+                  display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                  padding: '0.6rem 0.9rem',
+                  background: i === 2
+                    ? (highlight ? `${accent}12` : 'rgba(255,255,255,0.03)')
+                    : 'transparent',
+                  borderRadius: '10px',
+                  border: i === 2
+                    ? `1px solid ${accent}20`
+                    : '1px solid transparent',
+                }}
+              >
+                <span style={{
+                  fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '0.12em', color: '#334155',
+                }}>
+                  {label}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.15rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: accent }}>₹</span>
+                  <span style={{
+                    fontSize: i === 2 ? '1.6rem' : '1.25rem',
+                    fontWeight: 900,
+                    fontStyle: 'italic',
+                    lineHeight: 1,
+                    background: i === 2
+                      ? (highlight ? `linear-gradient(135deg, ${accent}, #fff)` : `linear-gradient(135deg, #fff, #94a3b8)`)
+                      : 'none',
+                    WebkitBackgroundClip: i === 2 ? 'text' : 'unset',
+                    WebkitTextFillColor: i === 2 ? 'transparent' : '#64748b',
+                    backgroundClip: i === 2 ? 'text' : 'unset',
+                    color: i === 2 ? 'unset' : '#64748b',
+                  }}>
+                    {value}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Features */}
-          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
             {features.map((f) => (
-              <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+              <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                 <div style={{
-                  width: '18px', height: '18px', borderRadius: '6px', flexShrink: 0,
+                  width: '17px', height: '17px', borderRadius: '6px', flexShrink: 0,
                   background: `${accent}14`, border: `1px solid ${accent}30`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Check size={10} color={accent} strokeWidth={3} />
+                  <Check size={9} color={accent} strokeWidth={3} />
                 </div>
-                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>{f}</span>
+                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>{f}</span>
               </li>
             ))}
           </ul>
@@ -134,8 +179,8 @@ export default function PriceCard({ title, price, unit = 'session', features = [
               fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase',
               letterSpacing: '0.18em', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+              whiteSpace: 'nowrap',
               transition: 'all 0.25s ease',
-              position: 'relative', overflow: 'hidden',
             }}
             onMouseEnter={(e) => {
               if (!highlight) {

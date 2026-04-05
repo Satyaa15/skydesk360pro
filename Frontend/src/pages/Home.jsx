@@ -577,26 +577,23 @@ const Home = () => {
                 <span style={{ background: 'linear-gradient(135deg, #a855f7, #00f2fe)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Nests.</span>
               </h2>
             </motion.div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
               <PriceCard
-                title="Hot Desks"
-                price="499"
-                unit="day"
-                features={['Daily Access', 'High-Speed WiFi', 'Coffee & Pantry', 'Shared Lounge']}
+                title="Dedicated Desk"
+                prices={{ hourly: '100', daily: '400', monthly: '7,000' }}
+                features={['Ergonomic Workstation', 'High-Speed WiFi', 'Coffee & Pantry', 'Shared Lounge']}
                 accent="#00f2fe"
               />
               <PriceCard
-                title="Private Cabins"
-                price="25,000"
-                unit="month"
-                features={['Dedicated Cabin', 'Concierge Service', 'Priority Meeting Room', 'Valet Parking']}
+                title="Private Cabin"
+                prices={{ hourly: '400', daily: '2,500', monthly: '35,000' }}
+                features={['Private Enclosed Space', 'Concierge Service', 'Priority Meeting Room', 'Valet Parking']}
                 highlight
                 accent="#a855f7"
               />
               <PriceCard
-                title="Meeting Rooms"
-                price="999"
-                unit="hour"
+                title="Conference Room"
+                prices={{ hourly: '550', daily: '4,500', monthly: '60,000' }}
                 features={['Up to 10 People', '4K Smart Screen', 'Fiber Internet', 'Whiteboard & AV']}
                 accent="#f97316"
               />
