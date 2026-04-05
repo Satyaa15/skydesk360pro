@@ -84,3 +84,74 @@ export const fetchAdminBookings = async () => {
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 };
+
+export const fetchAdminSeats = async () => {
+  const res = await fetch(`${API_BASE_URL}/admin/seats`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const createAdminSeat = async (payload) => {
+  const res = await fetch(`${API_BASE_URL}/admin/seats`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const updateAdminSeat = async (seatId, payload) => {
+  const res = await fetch(`${API_BASE_URL}/admin/seats/${seatId}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const resetSeatAvailability = async () => {
+  const res = await fetch(`${API_BASE_URL}/admin/seats/reset-availability`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const initializeSeats = async () => {
+  const res = await fetch(`${API_BASE_URL}/seats/initialize-office`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+/* --- Seats & Payments --- */
+export const fetchSeats = async () => {
+  const res = await fetch(`${API_BASE_URL}/seats`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const createPaymentOrderBatch = async (payload) => {
+  const res = await fetch(`${API_BASE_URL}/payment/create-order-batch`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const verifyPayment = async (payload) => {
+  const res = await fetch(`${API_BASE_URL}/payment/verify`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};

@@ -12,14 +12,14 @@ services:
     rootDir: Backend
     dockerfilePath: ./Dockerfile
     autoDeploy: true
-    healthCheckPath: /docs
+    healthCheckPath: /
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: ALGORITHM
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: 30
+        value: 480
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
@@ -28,6 +28,16 @@ services:
           property: connectionString
       - key: CORS_ORIGINS
         value: "https://skydesk-frontend.onrender.com,https://skydesk360.com,https://www.skydesk360.com"
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
 
   - type: web
     name: skydesk360-frontend
@@ -39,3 +49,5 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         sync: false
+        # REQUIRED: Set this in Render dashboard to your backend URL
+        # e.g. https://skydesk360-backend.onrender.com

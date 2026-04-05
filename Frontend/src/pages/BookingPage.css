@@ -297,11 +297,14 @@
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   min-height: 480px;
   user-select: none;
+  contain: layout paint;
 }
 
 .bp-map-transform {
   transform-origin: center center;
   padding: 1rem;
+  will-change: transform;
+  transition: transform 0.2s ease;
 }
 
 /* 3D Mode */
@@ -428,6 +431,11 @@
   fill: rgba(127,29,29,0.25);
   stroke: rgba(239,68,68,0.4);
 }
+.seat-marker.locked .chair-backrest {
+  fill: rgba(120,53,15,0.30);
+  stroke: rgba(251,191,36,0.55);
+  stroke-width: 1.2;
+}
 
 /* ── Chair Parts: Seat Pad ── */
 .chair-seat {
@@ -448,6 +456,10 @@
   fill: rgba(127,29,29,0.2);
   stroke: rgba(239,68,68,0.3);
 }
+.seat-marker.locked .chair-seat {
+  fill: rgba(120,53,15,0.22);
+  stroke: rgba(251,191,36,0.4);
+}
 
 /* ── Chair Parts: Armrests ── */
 .chair-arm {
@@ -459,6 +471,7 @@
 .seat-marker.available:hover .chair-arm { stroke: rgba(0,242,254,0.5); }
 .seat-marker.selected .chair-arm { stroke: rgba(0,242,254,0.7); }
 .seat-marker.booked .chair-arm { stroke: rgba(239,68,68,0.25); }
+.seat-marker.locked .chair-arm { stroke: rgba(251,191,36,0.30); }
 
 /* ── Chair Parts: Center Pole ── */
 .chair-pole {
@@ -469,6 +482,7 @@
 .seat-marker.available:hover .chair-pole { stroke: rgba(0,242,254,0.4); }
 .seat-marker.selected .chair-pole { stroke: rgba(0,242,254,0.6); }
 .seat-marker.booked .chair-pole { stroke: rgba(239,68,68,0.2); }
+.seat-marker.locked .chair-pole { stroke: rgba(251,191,36,0.25); }
 
 /* ── Chair Parts: Base ── */
 .chair-base {
@@ -480,6 +494,7 @@
 .seat-marker.available:hover .chair-base { stroke: rgba(0,242,254,0.4); }
 .seat-marker.selected .chair-base { stroke: rgba(0,242,254,0.5); }
 .seat-marker.booked .chair-base { stroke: rgba(239,68,68,0.2); }
+.seat-marker.locked .chair-base { stroke: rgba(251,191,36,0.22); }
 
 /* ── Chair Parts: Wheels ── */
 .chair-wheel {
@@ -490,6 +505,7 @@
 .seat-marker.available:hover .chair-wheel { fill: rgba(0,242,254,0.4); }
 .seat-marker.selected .chair-wheel { fill: rgba(0,242,254,0.5); }
 .seat-marker.booked .chair-wheel { fill: rgba(239,68,68,0.2); }
+.seat-marker.locked .chair-wheel { fill: rgba(251,191,36,0.25); }
 
 /* Glow ring for selected */
 .seat-glow-ring {
@@ -525,6 +541,9 @@
 }
 .seat-marker.booked .seat-label-svg {
   fill: rgba(239, 68, 68, 0.5);
+}
+.seat-marker.locked .seat-label-svg {
+  fill: rgba(251, 191, 36, 0.6);
 }
 
 /* Tooltips */
@@ -609,6 +628,19 @@
 .bp-legend-dot.booked {
   border-color: rgba(239, 68, 68, 0.4);
   background: rgba(127, 29, 29, 0.3);
+}
+.bp-legend-dot.locked {
+  border-color: rgba(251, 191, 36, 0.5);
+  background: rgba(120, 53, 15, 0.3);
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.2);
+}
+.tooltip-locked {
+  font-size: 4.5px;
+  font-weight: 800;
+  fill: #fbbf24;
+  text-anchor: middle;
+  letter-spacing: 0.08em;
+  font-family: "Inter", sans-serif;
 }
 .bp-legend-swatch {
   width: 12px;
@@ -1306,4 +1338,80 @@
   .form-row {
     flex-direction: column;
   }
+}
+
+.bp-seat-alert {
+  margin: 0 auto 1.2rem;
+  max-width: 880px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  color: #e2e8f0;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.bp-seat-alert.error {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fecaca;
+}
+
+.bp-duration {
+  margin: 0.75rem 0 1.25rem;
+}
+
+.bp-duration-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+}
+
+.bp-duration-options {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.bp-duration-btn {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #e2e8f0;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  transition: all 0.2s ease;
+}
+
+.bp-duration-btn.active {
+  border-color: rgba(0, 242, 254, 0.6);
+  background: rgba(0, 242, 254, 0.1);
+  color: #f8fafc;
+  box-shadow: 0 0 0 1px rgba(0, 242, 254, 0.2);
+}
+
+.bp-duration-summary {
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.order-duration {
+  margin-top: 0.6rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  text-align: right;
+}
+
+.payment-error {
+  margin: 0.75rem 0;
+  padding: 0.6rem 0.75rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 10px;
+  color: #fecaca;
+  font-size: 0.75rem;
+  text-align: center;
 }

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import init_db
-from app.api import auth, seats, bookings, admin
+from app.api import auth, seats, bookings, admin, payment
 from app.core.config import settings
 
 app = FastAPI(title=settings.PROJECT_NAME)
@@ -33,6 +33,7 @@ app.include_router(auth.router)
 app.include_router(seats.router)
 app.include_router(bookings.router)
 app.include_router(admin.router)
+app.include_router(payment.router)
 
 @app.get("/")
 def root():

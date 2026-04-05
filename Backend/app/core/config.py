@@ -66,6 +66,11 @@ class Settings:
     ADMIN_EMAIL: str | None = os.getenv("ADMIN_EMAIL")
     ADMIN_PASSWORD: str | None = os.getenv("ADMIN_PASSWORD")
 
+    # Razorpay
+    RAZORPAY_KEY_ID: str | None = os.getenv("RAZORPAY_KEY_ID")
+    RAZORPAY_KEY_SECRET: str | None = os.getenv("RAZORPAY_KEY_SECRET")
+    RAZORPAY_WEBHOOK_SECRET: str | None = os.getenv("RAZORPAY_WEBHOOK_SECRET")
+
     def validate(self) -> None:
         if not self.DATABASE_URL:
             raise ValueError("DATABASE_URL is required.")
@@ -77,6 +82,12 @@ class Settings:
 
             if "*" in self.CORS_ORIGINS:
                 raise ValueError("CORS_ORIGINS cannot contain '*' in production.")
+
+            if not self.RAZORPAY_KEY_ID or not self.RAZORPAY_KEY_SECRET:
+                raise ValueError("RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set in production.")
+
+            if not self.ADMIN_EMAIL or not self.ADMIN_PASSWORD:
+                raise ValueError("ADMIN_EMAIL and ADMIN_PASSWORD must be set in production.")
 
 
 settings = Settings()

@@ -1,8 +1,43 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, ArrowRight, ShieldCheck, FileText, IdCard, Check, Send } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, ShieldCheck, IdCard, Check, Send, Eye, EyeOff } from 'lucide-react';
 import { registerUser } from '../lib/api';
+
+const inputStyle = {
+  width: '100%',
+  background: 'rgba(255,255,255,0.03)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: '12px',
+  padding: '0.85rem 1rem 0.85rem 2.75rem',
+  color: '#e2e8f0',
+  fontSize: '0.875rem',
+  outline: 'none',
+  boxSizing: 'border-box',
+  transition: 'border-color 0.2s, box-shadow 0.2s',
+};
+
+const labelStyle = {
+  display: 'block',
+  fontSize: '0.58rem',
+  fontWeight: 800,
+  textTransform: 'uppercase',
+  letterSpacing: '0.18em',
+  color: '#475569',
+  marginBottom: '0.45rem',
+};
+
+function Field({ label, icon: Icon, children }) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      <div style={{ position: 'relative' }}>
+        {Icon && <Icon style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#334155', width: '15px', height: '15px' }} />}
+        {children}
+      </div>
+    </div>
+  );
+}
 
 const Register = () => {
   const navigate = useNavigate();
@@ -10,12 +45,9 @@ const Register = () => {
   const [verificationId, setVerificationId] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    govIdType: 'Aadhar',
-    govIdNumber: ''
+    fullName: '', email: '', password: '', govIdType: 'Aadhar', govIdNumber: '',
   });
 
   const createStableId = (prefix) => {
@@ -29,7 +61,6 @@ const Register = () => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
-
     try {
       const data = await registerUser({
         email: formData.email,
@@ -38,9 +69,9 @@ const Register = () => {
         gov_id_type: formData.govIdType,
         gov_id_number: formData.govIdNumber,
       });
-
-      // Show success modal
-      const reference = data.user_id ? `VER-${String(data.user_id).slice(0, 8).toUpperCase()}` : createStableId('VER-');
+      const reference = data.user_id
+        ? `VER-${String(data.user_id).slice(0, 8).toUpperCase()}`
+        : createStableId('VER-');
       setVerificationId(reference);
       setShowSuccess(true);
     } catch (err) {
@@ -50,174 +81,368 @@ const Register = () => {
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  const onFocus = (e) => {
+    e.target.style.borderColor = 'rgba(0,242,254,0.4)';
+    e.target.style.boxShadow = '0 0 0 3px rgba(0,242,254,0.06)';
+  };
+  const onBlur = (e) => {
+    e.target.style.borderColor = 'rgba(255,255,255,0.08)';
+    e.target.style.boxShadow = 'none';
   };
 
   return (
-    <div className="min-h-screen bg-[#020202] text-white flex items-center justify-center px-6 py-20 relative overflow-hidden">
-      {/* Background Glows */}
-      <div className="absolute top-1/4 -right-20 w-80 h-80 bg-blue-600/10 rounded-full blur-[120px]" />
-      <div className="absolute bottom-1/4 -left-20 w-80 h-80 bg-purple-600/10 rounded-full blur-[120px]" />
+    <div style={{ minHeight: '100vh', background: '#020204', color: '#fff', display: 'flex', fontFamily: "'Inter', sans-serif" }}>
 
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-lg z-10"
+      {/* ── Left Brand Panel ── */}
+      <div
+        className="hidden lg:flex flex-col justify-between"
+        style={{
+          width: '40%',
+          flexShrink: 0,
+          background: 'linear-gradient(145deg, #020204 0%, #080812 60%, #050510 100%)',
+          borderRight: '1px solid rgba(255,255,255,0.04)',
+          padding: '3rem',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
       >
-        <div className="text-center mb-10">
-          <Link to="/" className="text-2xl font-black italic no-underline text-white mb-4 block">
-            SKYDESK<span className="text-blue-500">360</span>
-          </Link>
-          <h2 className="text-3xl font-bold tracking-tight uppercase italic">Join the <span className="text-[#00f2fe]">Elite.</span></h2>
-          <p className="text-gray-500 mt-2">Create your account and secure your 14th-floor orbit.</p>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(168,85,247,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(168,85,247,0.03) 1px, transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: '-60px', right: '-60px', width: '280px', height: '280px', background: 'radial-gradient(circle, rgba(0,242,254,0.06) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '-80px', left: '-40px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(168,85,247,0.07) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+
+        <Link to="/" className="no-underline" style={{ position: 'relative', zIndex: 1 }}>
+          <span style={{ fontSize: '1.3rem', fontWeight: 900, fontStyle: 'italic', color: '#fff', letterSpacing: '-0.02em' }}>SKY</span>
+          <span style={{ fontSize: '1.3rem', fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #00f2fe, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>DESK360</span>
+        </Link>
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.2 }}>
+            <p style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#a855f7', marginBottom: '1rem' }}>Join the Community</p>
+            <h1 style={{ fontSize: '2.6rem', fontWeight: 900, fontStyle: 'italic', lineHeight: 1.05, letterSpacing: '-0.03em', marginBottom: '1.25rem' }}>
+              Work at<br />
+              <span style={{ background: 'linear-gradient(135deg, #a855f7 0%, #00f2fe 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>the top.</span>
+            </h1>
+            <p style={{ fontSize: '0.83rem', color: '#475569', lineHeight: 1.7, maxWidth: '320px', marginBottom: '2.5rem' }}>
+              Join hundreds of professionals who've made SkyDesk360 their second office. 14th floor views, first-class amenities.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {[
+                { icon: '🏙️', label: 'Panoramic 14th-floor city views' },
+                { icon: '⚡', label: 'High-speed fiber — 1 Gbps symmetric' },
+                { icon: '☕', label: 'Complimentary coffee & pantry access' },
+                { icon: '🔒', label: 'Private cabins & conference rooms' },
+              ].map((f, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -14 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.45 + i * 0.1 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}
+                >
+                  <span style={{ fontSize: '0.95rem' }}>{f.icon}</span>
+                  <span style={{ fontSize: '0.73rem', color: '#64748b', fontWeight: 500 }}>{f.label}</span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
         </div>
 
-        <form onSubmit={handleRegister} className="space-y-6 bg-white/[0.02] border border-white/5 p-8 rounded-[2rem] backdrop-blur-xl">
-          {error && (
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-bold">
-              {error}
-            </div>
-          )}
+        <div style={{ position: 'relative', zIndex: 1, paddingTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ fontSize: '0.7rem', color: '#1e293b', fontStyle: 'italic' }}>
+            "The best coworking space in the city — the views alone are worth it."
+          </div>
+          <div style={{ fontSize: '0.58rem', color: '#334155', fontWeight: 700, marginTop: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            — A happy member
+          </div>
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Full Name</label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
-                <input 
+      {/* ── Right Form Panel ── */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', overflowY: 'auto', position: 'relative' }}>
+        <div className="lg:hidden" style={{ position: 'absolute', top: '10%', right: '-10%', width: '350px', height: '350px', background: 'radial-gradient(circle, rgba(168,85,247,0.06) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          style={{ width: '100%', maxWidth: '480px', position: 'relative', zIndex: 1, paddingTop: '1rem', paddingBottom: '1rem' }}
+        >
+          {/* Mobile logo */}
+          <div className="lg:hidden text-center mb-8">
+            <Link to="/" className="no-underline">
+              <span style={{ fontSize: '1.2rem', fontWeight: 900, fontStyle: 'italic', color: '#fff' }}>SKY</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: 900, fontStyle: 'italic', background: 'linear-gradient(135deg, #00f2fe, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>DESK360</span>
+            </Link>
+          </div>
+
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '0.5rem' }}>
+              Create<br />
+              <span style={{ background: 'linear-gradient(135deg, #a855f7, #00f2fe)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                Your Account.
+              </span>
+            </h2>
+            <p style={{ fontSize: '0.78rem', color: '#475569' }}>Join the workspace revolution. It takes 60 seconds.</p>
+          </div>
+
+          <form
+            onSubmit={handleRegister}
+            style={{
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '20px',
+              padding: '1.75rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.1rem',
+            }}
+          >
+            {error && (
+              <div style={{ padding: '0.8rem 1rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#fca5a5', fontSize: '0.75rem', fontWeight: 600 }}>
+                {error}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <Field label="Full Name" icon={User}>
+                <input
                   name="fullName"
-                  type="text" 
+                  type="text"
                   required
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-[#00f2fe] transition-colors text-sm"
                   placeholder="John Doe"
                   onChange={handleChange}
+                  style={inputStyle}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
                 />
-              </div>
-            </div>
+              </Field>
 
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
-                <input 
+              <Field label="Email" icon={Mail}>
+                <input
                   name="email"
-                  type="email" 
+                  type="email"
                   required
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-[#00f2fe] transition-colors text-sm"
-                  placeholder="john@company.com"
+                  placeholder="john@co.com"
                   onChange={handleChange}
+                  style={inputStyle}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
                 />
-              </div>
+              </Field>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Password</label>
-            <div className="relative">
-              <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
-                <input 
-                  name="password"
-                  type="password" 
-                  required
-                  minLength={8}
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-[#00f2fe] transition-colors text-sm"
-                  placeholder="Minimum 8 characters"
-                  onChange={handleChange}
-                />
-            </div>
-          </div>
+            <Field label="Password" icon={Lock}>
+              <input
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                required
+                minLength={8}
+                placeholder="Minimum 8 characters"
+                onChange={handleChange}
+                style={{ ...inputStyle, paddingRight: '3rem' }}
+                onFocus={onFocus}
+                onBlur={onBlur}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#334155' }}
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </Field>
 
-          <div className="pt-4 border-t border-white/5">
-            <h3 className="text-[10px] uppercase tracking-[0.2em] text-[#00f2fe] font-black mb-6">Government Verification Required</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">ID Type</label>
-                <select 
-                  name="govIdType"
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl py-4 px-4 focus:outline-none focus:border-[#00f2fe] transition-colors text-sm text-gray-400"
-                  onChange={handleChange}
-                >
-                  <option value="Aadhar">Aadhar Card</option>
-                  <option value="PAN">PAN Card</option>
-                  <option value="Passport">Passport</option>
-                  <option value="Driving License">Driving License</option>
-                </select>
+            {/* Gov ID section */}
+            <div style={{ paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.25em', color: '#00f2fe', marginBottom: '0.85rem' }}>
+                Government ID Verification
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={labelStyle}>ID Type</label>
+                  <select
+                    name="govIdType"
+                    onChange={handleChange}
+                    style={{
+                      ...inputStyle,
+                      paddingLeft: '1rem',
+                      color: '#94a3b8',
+                      appearance: 'none',
+                      cursor: 'pointer',
+                    }}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
+                  >
+                    <option value="Aadhar">Aadhar Card</option>
+                    <option value="PAN">PAN Card</option>
+                    <option value="Passport">Passport</option>
+                    <option value="Driving License">Driving License</option>
+                  </select>
+                </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">ID Number</label>
-                <div className="relative">
-                  <IdCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
-                  <input 
+                <Field label="ID Number" icon={IdCard}>
+                  <input
                     name="govIdNumber"
-                    type="text" 
+                    type="text"
                     required
                     minLength={4}
-                    className="w-full bg-white/[0.03] border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-[#00f2fe] transition-colors text-sm"
-                    placeholder="Verification Number"
+                    placeholder="Verification No."
                     onChange={handleChange}
+                    style={inputStyle}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
                   />
-                </div>
+                </Field>
               </div>
             </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                background: isSubmitting ? 'rgba(168,85,247,0.3)' : 'linear-gradient(135deg, #a855f7, #00f2fe)',
+                border: 'none',
+                borderRadius: '12px',
+                color: isSubmitting ? 'rgba(0,0,0,0.4)' : '#000',
+                fontSize: '0.72rem',
+                fontWeight: 900,
+                textTransform: 'uppercase',
+                letterSpacing: '0.18em',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                marginTop: '0.25rem',
+                transition: 'all 0.3s ease',
+                boxShadow: isSubmitting ? 'none' : '0 4px 24px rgba(168,85,247,0.2)',
+              }}
+              onMouseEnter={(e) => { if (!isSubmitting) { e.currentTarget.style.boxShadow = '0 6px 36px rgba(168,85,247,0.35)'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 4px 24px rgba(168,85,247,0.2)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+            >
+              {isSubmitting ? 'Creating...' : <><span>Create Account</span><ArrowRight size={15} /></>}
+            </button>
+          </form>
+
+          <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.8rem', color: '#475569' }}>
+            Already a member?{' '}
+            <Link to="/signin" className="no-underline" style={{ color: '#a855f7', fontWeight: 700 }}>
+              Sign In
+            </Link>
+          </p>
+
+          <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', color: '#1e293b', fontSize: '0.57rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><ShieldCheck size={11} /> Secure</span>
+            <span style={{ width: '1px', height: '10px', background: 'rgba(255,255,255,0.05)' }} />
+            <span>Privacy Protected</span>
+            <span style={{ width: '1px', height: '10px', background: 'rgba(255,255,255,0.05)' }} />
+            <span>Data Encrypted</span>
           </div>
+        </motion.div>
+      </div>
 
-          <button 
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-white text-black font-black uppercase tracking-widest py-5 rounded-xl flex items-center justify-center gap-2 hover:bg-[#00f2fe] transition-all active:scale-[0.98]"
-          >
-            {isSubmitting ? 'Creating Account...' : <>Create Account <ArrowRight size={16} /></>}
-          </button>
-        </form>
-
-        <p className="text-center mt-8 text-sm text-gray-500">
-          Already a pioneer? <Link to="/signin" className="text-[#00f2fe] font-bold hover:underline">Sign In</Link>
-        </p>
-
-        <div className="mt-12 flex items-center justify-center gap-6 text-[9px] text-gray-600 uppercase tracking-widest font-black">
-          <span className="flex items-center gap-2"><ShieldCheck size={12}/> Secure Onboarding</span>
-          <span className="flex items-center gap-2">Privacy Protected</span>
-        </div>
-      </motion.div>
-
-      {/* ──── SUCCESS MODAL (MOCK EMAIL SENT) ──── */}
+      {/* ── SUCCESS MODAL ── */}
       <AnimatePresence>
         {showSuccess && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center px-6 bg-[#020202]/90 backdrop-blur-md"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 100,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1.5rem',
+              background: 'rgba(2,2,4,0.9)',
+              backdropFilter: 'blur(20px)',
+            }}
           >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
+            <motion.div
+              initial={{ scale: 0.88, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="w-full max-w-sm bg-white/[0.03] border border-white/10 p-10 rounded-[3rem] text-center shadow-2xl relative"
+              transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+              style={{
+                width: '100%',
+                maxWidth: '380px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '28px',
+                padding: '2.5rem',
+                textAlign: 'center',
+              }}
             >
-              <div className="w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20 mx-auto mb-8 relative">
-                <Send size={32} className="text-[#00f2fe] animate-pulse" />
-                <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center border-2 border-[#020202]">
-                  <Check size={12} className="text-white font-bold" />
+              <div style={{
+                width: '72px', height: '72px', borderRadius: '50%',
+                background: 'linear-gradient(135deg, rgba(0,242,254,0.12), rgba(168,85,247,0.12))',
+                border: '1px solid rgba(0,242,254,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 1.5rem',
+                position: 'relative',
+              }}>
+                <Send size={28} color="#00f2fe" />
+                <div style={{
+                  position: 'absolute', top: '-4px', right: '-4px', width: '22px', height: '22px',
+                  borderRadius: '50%', background: '#22c55e',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '2px solid #020204',
+                }}>
+                  <Check size={11} color="#fff" strokeWidth={3} />
                 </div>
               </div>
 
-              <h2 className="text-2xl font-black italic uppercase mb-4 tracking-tight">Check Your <span className="text-[#00f2fe]">Mail.</span></h2>
-              <p className="text-gray-400 text-sm mb-8 leading-relaxed">
-                Welcome to the stratosphere! We've sent a registration confirmation to <span className="text-white font-bold">{formData.email}</span>.
+              <h2 style={{ fontSize: '1.6rem', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                Account <span style={{ background: 'linear-gradient(135deg, #00f2fe, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Created!</span>
+              </h2>
+              <p style={{ color: '#64748b', fontSize: '0.82rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                Welcome to SkyDesk360. We sent a confirmation to{' '}
+                <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{formData.email}</span>.
               </p>
 
-              <div className="bg-white/5 rounded-2xl p-4 mb-8 text-[10px] text-gray-500 uppercase tracking-widest font-bold">
-                Verification ID: {verificationId}
+              <div style={{
+                background: 'rgba(0,242,254,0.06)',
+                border: '1px solid rgba(0,242,254,0.15)',
+                borderRadius: '10px',
+                padding: '0.7rem 1.25rem',
+                fontSize: '0.65rem',
+                fontWeight: 800,
+                color: '#00f2fe',
+                letterSpacing: '0.1em',
+                marginBottom: '1.75rem',
+                textTransform: 'uppercase',
+              }}>
+                Ref: {verificationId}
               </div>
 
-              <button 
+              <button
                 onClick={() => navigate('/signin')}
-                className="w-full bg-[#00f2fe] text-black font-black uppercase tracking-widest py-5 rounded-2xl flex items-center justify-center gap-2 hover:bg-white transition-all shadow-[0_0_20px_rgba(0,242,254,0.3)]"
+                style={{
+                  width: '100%',
+                  padding: '0.9rem',
+                  background: 'linear-gradient(135deg, #00f2fe, #a855f7)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: '#000',
+                  fontSize: '0.72rem',
+                  fontWeight: 900,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.18em',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  boxShadow: '0 4px 24px rgba(0,242,254,0.2)',
+                }}
               >
-                Go to Sign In <ArrowRight size={16} />
+                Go to Sign In <ArrowRight size={15} />
               </button>
             </motion.div>
           </motion.div>

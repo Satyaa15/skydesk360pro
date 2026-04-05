@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Armchair, X, ChevronRight, Users, Building2, BriefcaseBusiness, ZoomIn, ZoomOut, RotateCcw, Box, Layers, Move } from 'lucide-react';
 import './BookingPage.css';
+import { fetchSeats } from '../lib/api';
 
 /* ─── Constants ─── */
 const WORKSPACE_LABELS = {
@@ -19,6 +20,25 @@ const WORKSPACE_FILTERS = [
   { id: 'meeting_room', label: 'Meeting Room' },
   { id: 'conference', label: 'Conference' },
 ];
+
+const DURATION_OPTIONS = [
+  { id: 'hourly', label: 'Hourly' },
+  { id: 'daily', label: 'Daily' },
+  { id: 'monthly', label: 'Monthly' },
+  { id: 'yearly', label: 'Yearly' },
+];
+
+const computeDurationPrice = (basePrice, durationUnit) => {
+  if (durationUnit === 'hourly') return basePrice / 30 / 24;
+  if (durationUnit === 'daily') return basePrice / 30;
+  if (durationUnit === 'yearly') return basePrice * 12 * 0.9;
+  return basePrice;
+};
+
+const formatPrice = (value) => {
+  const rounded = Math.round(value * 100) / 100;
+  return rounded.toLocaleString();
+};
 
 const ZONE_COLORS = {
   workstation: { fill: 'rgba(56,189,248,0.10)', stroke: '#38bdf8', label: '#38bdf8' },
@@ -84,7 +104,7 @@ const FLOOR_PLAN_SEATS = [
 
 
 /* ─── SVG Floor Plan Component ─── */
-const FloorPlanSVG = ({ visibleSeats, isSeatSelected, toggleSeat, hoveredSeat, setHoveredSeat }) => (
+const FloorPlanSVG = React.memo(({ visibleSeats, isSeatSelected, toggleSeat, hoveredSeat, setHoveredSeat, durationUnit }) => (
   <svg viewBox="0 0 640 480" className="floor-svg" xmlns="http://www.w3.org/2000/svg">
     <defs>
       {/* Glow filters */}
@@ -230,7 +250,14 @@ const FloorPlanSVG = ({ visibleSeats, isSeatSelected, toggleSeat, hoveredSeat, s
     {visibleSeats.map((seat) => {
       const selected = isSeatSelected(seat.id);
       const isHovered = hoveredSeat === seat.id;
-      const seatClass = seat.booked ? 'seat-marker booked' : selected ? 'seat-marker selected' : 'seat-marker available';
+      const isUnavailable = seat.booked || seat.locked || !seat.dbId;
+      const seatClass = seat.locked
+        ? 'seat-marker locked'
+        : seat.booked
+          ? 'seat-marker booked'
+          : selected
+            ? 'seat-marker selected'
+            : 'seat-marker available';
       const cx = seat.cx;
       const cy = seat.cy;
 
@@ -238,8 +265,8 @@ const FloorPlanSVG = ({ visibleSeats, isSeatSelected, toggleSeat, hoveredSeat, s
         <g key={seat.id} className={seatClass}
           onMouseEnter={() => setHoveredSeat(seat.id)}
           onMouseLeave={() => setHoveredSeat(null)}
-          onClick={(e) => { e.stopPropagation(); if (!seat.booked) toggleSeat(seat); }}
-          style={{ cursor: seat.booked ? 'not-allowed' : 'pointer' }}
+          onClick={(e) => { e.stopPropagation(); if (!isUnavailable) toggleSeat(seat); }}
+          style={{ cursor: isUnavailable ? 'not-allowed' : 'pointer' }}
         >
           {/* Selected glow background */}
           {selected && (
@@ -278,27 +305,41 @@ const FloorPlanSVG = ({ visibleSeats, isSeatSelected, toggleSeat, hoveredSeat, s
             {seat.id}
           </text>
 
-          {/* Hover tooltip */}
-          {isHovered && !seat.booked && (
+          {/* Hover tooltip — available */}
+          {isHovered && !seat.booked && !seat.locked && (
             <g className="seat-tooltip-group">
               <rect x={cx - 55} y={cy - 32} width="110" height="34" rx="6"
                 fill="rgba(15,23,42,0.95)" stroke="rgba(0,242,254,0.3)" strokeWidth="0.8" />
               <text x={cx} y={cy - 19} className="tooltip-title">{seat.id} — {seat.zone}</text>
-              <text x={cx} y={cy - 7} className="tooltip-price">₹{seat.price.toLocaleString()}/mo</text>
+              <text x={cx} y={cy - 7} className="tooltip-price">₹{formatPrice(seat.displayPrice ?? seat.price)}/{durationUnit}</text>
             </g>
           )}
+          {/* Hover tooltip — permanently booked */}
           {isHovered && seat.booked && (
             <g className="seat-tooltip-group">
               <rect x={cx - 30} y={cy - 30} width="60" height="20" rx="5"
                 fill="rgba(127,29,29,0.92)" stroke="rgba(239,68,68,0.3)" strokeWidth="0.8" />
-              <text x={cx} y={cx - 16} className="tooltip-booked">BOOKED</text>
+              <text x={cx} y={cy - 16} className="tooltip-booked">UNAVAILABLE</text>
+            </g>
+          )}
+          {/* Hover tooltip — time-locked */}
+          {isHovered && seat.locked && (
+            <g className="seat-tooltip-group">
+              <rect x={cx - 55} y={cy - 38} width="110" height="42" rx="6"
+                fill="rgba(28,20,5,0.95)" stroke="rgba(251,191,36,0.35)" strokeWidth="0.8" />
+              <text x={cx} y={cy - 25} className="tooltip-locked">🔒 {seat.id} — LOCKED</text>
+              <text x={cx} y={cy - 14} className="tooltip-title">
+                {seat.lockedUntil
+                  ? `Until ${seat.lockedUntil.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`
+                  : 'Currently occupied'}
+              </text>
             </g>
           )}
         </g>
       );
     })}
   </svg>
-);
+));
 
 
 /* ─── Main Component ─── */
@@ -306,6 +347,10 @@ const BookingPage = () => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedSeats, setSelectedSeats] = useState([]);
+  const [durationUnit, setDurationUnit] = useState('monthly');
+  const [backendSeats, setBackendSeats] = useState([]);
+  const [seatError, setSeatError] = useState('');
+  const [loadingSeats, setLoadingSeats] = useState(true);
   const [viewMode, setViewMode] = useState('2d'); // '2d' | '3d'
   const [hoveredSeat, setHoveredSeat] = useState(null);
 
@@ -313,16 +358,71 @@ const BookingPage = () => {
   const [zoom, setZoom] = useState(1);
   const mapRef = useRef(null);
 
+  useEffect(() => {
+    let active = true;
+    setLoadingSeats(true);
+    fetchSeats()
+      .then((data) => {
+        if (!active) return;
+        setBackendSeats(Array.isArray(data) ? data : []);
+        setSeatError('');
+      })
+      .catch((err) => {
+        if (!active) return;
+        setSeatError(err?.message || 'Failed to load seats');
+      })
+      .finally(() => {
+        if (active) setLoadingSeats(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const backendSeatMap = useMemo(() => {
+    const map = new Map();
+    backendSeats.forEach((seat) => {
+      map.set(seat.code, seat);
+    });
+    return map;
+  }, [backendSeats]);
+
+  const enrichedSeats = useMemo(() => (
+    FLOOR_PLAN_SEATS.map((seat) => {
+      const backendSeat = backendSeatMap.get(seat.id);
+      if (!backendSeat) {
+        return { ...seat, booked: true, locked: false, lockedUntil: null, dbId: null, backendAvailable: false };
+      }
+      const isLocked = !!backendSeat.locked_until;
+      return {
+        ...seat,
+        dbId: backendSeat.id,
+        code: backendSeat.code,
+        price: backendSeat.price,
+        booked: !backendSeat.is_available && !isLocked,
+        locked: isLocked,
+        lockedUntil: backendSeat.locked_until ? new Date(backendSeat.locked_until) : null,
+        backendAvailable: backendSeat.is_available,
+      };
+    })
+  ), [backendSeatMap]);
+
   const visibleSeats = useMemo(() => {
-    if (activeFilter === 'all') return FLOOR_PLAN_SEATS;
-    return FLOOR_PLAN_SEATS.filter((s) => s.workspaceType === activeFilter);
-  }, [activeFilter]);
+    const filtered = activeFilter === 'all'
+      ? enrichedSeats
+      : enrichedSeats.filter((s) => s.workspaceType === activeFilter);
+    return filtered.map((seat) => ({
+      ...seat,
+      displayPrice: computeDurationPrice(seat.price, durationUnit),
+    }));
+  }, [activeFilter, enrichedSeats, durationUnit]);
 
   const workspaceStats = useMemo(() => {
-    const seatTotal = FLOOR_PLAN_SEATS.length;
-    const availableSeats = FLOOR_PLAN_SEATS.filter((s) => !s.booked).length;
+    const seatTotal = enrichedSeats.length;
+    const availableSeats = enrichedSeats.filter((s) => s.backendAvailable).length;
     return { seatTotal, availableSeats };
-  }, []);
+  }, [enrichedSeats]);
 
   const toggleSeat = useCallback((seat) => {
     setSelectedSeats((prev) => {
@@ -333,7 +433,10 @@ const BookingPage = () => {
 
   const removeSeat = (seatId) => setSelectedSeats((prev) => prev.filter((s) => s.id !== seatId));
   const isSeatSelected = useCallback((seatId) => selectedSeats.some((s) => s.id === seatId), [selectedSeats]);
-  const totalPrice = useMemo(() => selectedSeats.reduce((sum, s) => sum + s.price, 0), [selectedSeats]);
+  const totalPrice = useMemo(
+    () => selectedSeats.reduce((sum, s) => sum + computeDurationPrice(s.price, durationUnit), 0),
+    [selectedSeats, durationUnit]
+  );
   const selectionBreakdown = useMemo(() =>
     selectedSeats.reduce((acc, s) => { acc[s.workspaceType] = (acc[s.workspaceType] || 0) + 1; return acc; }, {}),
     [selectedSeats]
@@ -341,7 +444,7 @@ const BookingPage = () => {
 
   const handleProceed = () => {
     navigate('/payment', {
-      state: { seats: selectedSeats, total: totalPrice, floor: '14th Floor - SkyDesk360 Baner Layout' },
+      state: { seats: selectedSeats, total: totalPrice, durationUnit, floor: '14th Floor - SkyDesk360 Baner Layout' },
     });
   };
 
@@ -381,6 +484,14 @@ const BookingPage = () => {
         </motion.div>
       </div>
 
+      {(loadingSeats || seatError || (!loadingSeats && backendSeats.length === 0)) && (
+        <div className={`bp-seat-alert ${seatError ? 'error' : ''}`}>
+          {loadingSeats && 'Loading seat availability...'}
+          {seatError && `Seat load failed: ${seatError}`}
+          {!loadingSeats && !seatError && backendSeats.length === 0 && 'No seats found in the database. Ask admin to initialize seats.'}
+        </div>
+      )}
+
       {/* ─── Filters ─── */}
       <div className="bp-filters">
         {WORKSPACE_FILTERS.map((f) => (
@@ -392,7 +503,7 @@ const BookingPage = () => {
 
       {/* ─── Stats bar ─── */}
       <div className="bp-stats">
-        <span className="bp-stat"><Users size={13} /> {workspaceStats.availableSeats} available / {workspaceStats.seatTotal} total</span>
+        <span className="bp-stat"><Users size={13} /> Remaining seats: {workspaceStats.availableSeats} / {workspaceStats.seatTotal}</span>
         <span className="bp-stat"><BriefcaseBusiness size={13} /> SVG precision floor plan</span>
         <span className="bp-stat"><Building2 size={13} /> 4 workspace categories</span>
       </div>
@@ -433,6 +544,7 @@ const BookingPage = () => {
                 toggleSeat={toggleSeat}
                 hoveredSeat={hoveredSeat}
                 setHoveredSeat={setHoveredSeat}
+                durationUnit={durationUnit}
               />
             </div>
           </div>
@@ -448,8 +560,12 @@ const BookingPage = () => {
               <span>Selected</span>
             </div>
             <div className="bp-legend-item">
+              <div className="bp-legend-dot locked" />
+              <span>Locked</span>
+            </div>
+            <div className="bp-legend-item">
               <div className="bp-legend-dot booked" />
-              <span>Booked</span>
+              <span>Unavailable</span>
             </div>
             <div className="bp-legend-sep" />
             <div className="bp-legend-item">
@@ -473,11 +589,30 @@ const BookingPage = () => {
 
         {/* ─── Sidebar ─── */}
         <div className="bp-sidebar">
-          <div className="bp-summary-card">
-            <div className="bp-summary-accent" />
-            <h3 className="bp-summary-title">Booking Summary</h3>
+        <div className="bp-summary-card">
+          <div className="bp-summary-accent" />
+          <h3 className="bp-summary-title">Booking Summary</h3>
 
-            {selectedSeats.length === 0 ? (
+          <div className="bp-duration">
+            <div className="bp-duration-label">Billing Duration</div>
+            <div className="bp-duration-options">
+              {DURATION_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  className={`bp-duration-btn ${durationUnit === option.id ? 'active' : ''}`}
+                  onClick={() => setDurationUnit(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bp-duration-summary">
+            Selected {selectedSeats.length} of {workspaceStats.availableSeats} remaining
+          </div>
+
+          {selectedSeats.length === 0 ? (
               <div className="bp-empty-state">
                 <div className="bp-empty-icon-wrap">
                   <Armchair className="bp-empty-icon" />
@@ -502,7 +637,7 @@ const BookingPage = () => {
                           <span className="bp-seat-type">{WORKSPACE_LABELS[seat.workspaceType]}</span>
                         </div>
                         <div className="bp-seat-actions">
-                          <span className="bp-seat-price">₹{seat.price.toLocaleString()}</span>
+                          <span className="bp-seat-price">₹{formatPrice(computeDurationPrice(seat.price, durationUnit))}</span>
                           <button className="bp-remove-btn" onClick={() => removeSeat(seat.id)} title="Remove"><X size={13} /></button>
                         </div>
                       </motion.div>
@@ -520,8 +655,10 @@ const BookingPage = () => {
 
                 <div className="bp-total-row">
                   <span className="bp-total-label">Total</span>
-                  <span className="bp-total-amount">₹{totalPrice.toLocaleString()}</span>
+                  <span className="bp-total-amount">₹{formatPrice(totalPrice)}</span>
                 </div>
+
+                <div className="bp-duration-summary">Billing: {durationUnit.charAt(0).toUpperCase() + durationUnit.slice(1)}</div>
               </>
             )}
 

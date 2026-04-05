@@ -101,10 +101,51 @@ const ScrollCanvas = ({ frameCount = 240, isLoaded, setIsLoaded }) => {
   return (
     <>
       {!isLoaded && (
-        <div className="fixed inset-0 z-[100] bg-[#0a0a0a] flex flex-col items-center justify-center text-white">
-          <h2 className="text-xl font-bold italic mb-6">SKYDESK<span className="text-blue-500">360</span></h2>
-          <div className="w-40 h-[2px] bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: '#020204',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            fontFamily: "'Inter', sans-serif",
+          }}
+        >
+          {/* Ambient orbs */}
+          <div style={{ position: 'absolute', top: '30%', left: '20%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(0,242,254,0.04) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: '20%', right: '15%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(168,85,247,0.05) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+
+          {/* Logo */}
+          <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '1.6rem', fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.02em', marginBottom: '0.3rem' }}>
+              <span style={{ color: '#fff' }}>SKY</span>
+              <span style={{
+                background: 'linear-gradient(135deg, #00f2fe, #a855f7)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+              }}>DESK360</span>
+            </div>
+            <div style={{ fontSize: '0.5rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4em', color: '#1e293b' }}>
+              Loading Experience
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ width: '180px', position: 'relative' }}>
+            <div style={{ height: '2px', background: 'rgba(255,255,255,0.05)', borderRadius: '999px', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: '999px',
+                background: 'linear-gradient(90deg, #00f2fe, #a855f7)',
+                width: `${progress}%`,
+                transition: 'width 0.3s ease',
+                boxShadow: '0 0 12px rgba(0,242,254,0.5)',
+              }} />
+            </div>
+            <div style={{
+              position: 'absolute', right: 0, top: '8px',
+              fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase',
+              letterSpacing: '0.15em', color: '#1e293b',
+            }}>
+              {progress}%
+            </div>
           </div>
         </div>
       )}

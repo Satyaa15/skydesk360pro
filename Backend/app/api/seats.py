@@ -1,21 +1,75 @@
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
+from pydantic import BaseModel
 from app.db.database import get_session
-from app.models.models import Seat, SeatType
+from app.models.models import Seat
 from app.core.auth import admin_required
-from typing import List
+from typing import List, Optional
+from datetime import datetime, timezone
+from app.models.models import Booking, BookingStatus
+from app.seed.office import get_office_seats
 
 router = APIRouter(prefix="/seats", tags=["seats"])
 
-@router.get("/", response_model=List[Seat])
-def get_seats(session: Session = Depends(get_session)):
-    statement = select(Seat)
-    return session.exec(statement).all()
 
-@router.get("/available", response_model=List[Seat])
+class SeatResponse(BaseModel):
+    id: int
+    code: str
+    type: str
+    section: str
+    price: float
+    is_available: bool
+    locked_until: Optional[datetime] = None
+
+
+def _build_lock_map(session: Session) -> dict[int, datetime]:
+    """Returns {seat_id: end_time} for all currently active paid bookings."""
+    now = datetime.now(timezone.utc)
+    rows = session.exec(
+        select(Booking.seat_id, Booking.end_time).where(
+            Booking.status == BookingStatus.PAID,
+            Booking.end_time.is_not(None),
+            Booking.end_time > now,
+        )
+    ).all()
+    return {seat_id: end_time for seat_id, end_time in rows}
+
+
+@router.get("/", response_model=List[SeatResponse])
+def get_seats(session: Session = Depends(get_session)):
+    seats = session.exec(select(Seat)).all()
+    lock_map = _build_lock_map(session)
+    return [
+        SeatResponse(
+            id=seat.id,
+            code=seat.code,
+            type=seat.type,
+            section=seat.section,
+            price=seat.price,
+            is_available=seat.is_available and seat.id not in lock_map,
+            locked_until=lock_map.get(seat.id),
+        )
+        for seat in seats
+    ]
+
+
+@router.get("/available", response_model=List[SeatResponse])
 def get_available_seats(session: Session = Depends(get_session)):
-    statement = select(Seat).where(Seat.is_available == True)
-    return session.exec(statement).all()
+    seats = session.exec(select(Seat)).all()
+    lock_map = _build_lock_map(session)
+    return [
+        SeatResponse(
+            id=seat.id,
+            code=seat.code,
+            type=seat.type,
+            section=seat.section,
+            price=seat.price,
+            is_available=True,
+            locked_until=None,
+        )
+        for seat in seats
+        if seat.is_available and seat.id not in lock_map
+    ]
 
 @router.post("/initialize-office", dependencies=[Depends(admin_required)])
 def initialize_office(session: Session = Depends(get_session)):
@@ -23,31 +77,7 @@ def initialize_office(session: Session = Depends(get_session)):
     if session.exec(select(Seat)).first():
         return {"message": "Office already initialized"}
         
-    # Example data based on provided blueprint
-    # Workstations (Top)
-    workstations = []
-    for row in range(1, 3):
-        for i in range(1, 7):
-            workstations.append(Seat(
-                code=f"WS-{row}{chr(64+i)}",
-                type=SeatType.WORKSTATION,
-                section="Main Area",
-                price=500.0
-            ))
-            
-    # Cabins
-    cabins = [
-        Seat(code="CEO-1", type=SeatType.CABIN, section="CEO Cabin", price=2000.0),
-        Seat(code="DIR-1", type=SeatType.CABIN, section="Director Cabin", price=1500.0)
-    ]
-    
-    # Meeting Rooms
-    meeting_rooms = [
-        Seat(code="MR-1", type=SeatType.MEETING_ROOM, section="2-Seater Meeting Room", price=800.0),
-        Seat(code="CONF-1", type=SeatType.MEETING_ROOM, section="10-Seater Conf", price=3000.0)
-    ]
-    
-    all_seats = workstations + cabins + meeting_rooms
+    all_seats = get_office_seats()
     for seat in all_seats:
         session.add(seat)
     
