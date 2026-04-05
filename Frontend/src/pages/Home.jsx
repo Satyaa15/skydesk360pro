@@ -211,7 +211,7 @@ function BookingFlowVisual() {
 const Home = () => {
   const navigate = useNavigate();
   const [isLoaded, setIsLoaded] = useState(false);
-  const isLoggedIn = !!localStorage.getItem('token');
+  const isLoggedIn = !!sessionStorage.getItem('token');
   const position = [18.5523284, 73.7714723];
 
   const videoRef = useRef(null);
@@ -296,7 +296,7 @@ const Home = () => {
 
           <motion.p
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.7 }}
-            style={{ fontSize: 'clamp(0.85rem, 1.5vw, 1.1rem)', color: '#475569', maxWidth: '520px', lineHeight: 1.7, marginBottom: '3rem', fontWeight: 400 }}
+            style={{ fontSize: 'clamp(0.9rem, 1.5vw, 1.1rem)', color: '#94a3b8', maxWidth: '520px', lineHeight: 1.7, marginBottom: '3rem', fontWeight: 400 }}
           >
             Pune's most premium coworking floor. Luxury meets productivity — reserve your seat in under 60 seconds.
           </motion.p>
@@ -345,20 +345,20 @@ const Home = () => {
           >
             <button
               onClick={() => navigate(isLoggedIn ? '/book' : '/signin')}
-              className="group"
               style={{
                 padding: '1rem 2.5rem', borderRadius: '999px',
                 background: 'linear-gradient(135deg, #00f2fe, #a855f7)',
                 border: 'none', cursor: 'pointer', color: '#000',
                 fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em',
-                display: 'flex', alignItems: 'center', gap: '0.6rem',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                whiteSpace: 'nowrap',
                 boxShadow: '0 0 40px rgba(0,242,254,0.25)',
                 transition: 'all 0.3s ease',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 0 60px rgba(0,242,254,0.45)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 0 40px rgba(0,242,254,0.25)'; e.currentTarget.style.transform = 'translateY(0)'; }}
             >
-              Reserve Your Seat <ArrowRight size={15} />
+              <span>Reserve Your Seat</span><ArrowRight size={15} />
             </button>
             <a
               href="#pricing"
@@ -632,14 +632,15 @@ const Home = () => {
                 background: 'linear-gradient(135deg, #00f2fe, #a855f7)',
                 border: 'none', cursor: 'pointer', color: '#000',
                 fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em',
-                display: 'inline-flex', alignItems: 'center', gap: '0.6rem',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
+                whiteSpace: 'nowrap',
                 boxShadow: '0 0 60px rgba(0,242,254,0.2)',
                 transition: 'all 0.3s ease',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 0 80px rgba(0,242,254,0.4)'; e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 0 60px rgba(0,242,254,0.2)'; e.currentTarget.style.transform = 'translateY(0) scale(1)'; }}
             >
-              Get Started Free <ArrowRight size={16} />
+              <span>Get Started Free</span> <ArrowRight size={16} />
             </button>
           </motion.div>
         </section>

@@ -52,19 +52,19 @@ export const loginUser = async (email, password) => {
 };
 
 export const setAuthSession = ({ token, user }) => {
-  localStorage.setItem('token', token);
-  localStorage.setItem('user', JSON.stringify(user));
+  sessionStorage.setItem('token', token);
+  sessionStorage.setItem('user', JSON.stringify(user));
 };
 
 export const clearAuthSession = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('user');
 };
 
 /* ─── Admin API ─── */
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  Authorization: `Bearer ${localStorage.getItem('token')}`,
+  Authorization: `Bearer ${sessionStorage.getItem('token')}`,
 });
 
 export const fetchAdminStats = async () => {

@@ -75,9 +75,9 @@ const PaymentPage = () => {
   const [upiId, setUpiId]           = useState('');
   const [selectedUpi, setSelectedUpi] = useState('');
 
-  const user = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
+  const user = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}'); } catch { return {}; } })();
 
-  useEffect(() => { if (!localStorage.getItem('token')) navigate('/signin'); }, [navigate]);
+  useEffect(() => { if (!sessionStorage.getItem('token')) navigate('/signin'); }, [navigate]);
 
   const createBookingId = () => {
     if (globalThis.crypto?.randomUUID) return `SKY-${globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase()}`;

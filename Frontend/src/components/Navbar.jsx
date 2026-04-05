@@ -5,10 +5,10 @@ import { clearAuthSession } from '../lib/api';
 
 const getStoredUser = () => {
   try {
-    const rawUser = localStorage.getItem('user');
+    const rawUser = sessionStorage.getItem('user');
     return rawUser ? JSON.parse(rawUser) : null;
   } catch {
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
     return null;
   }
 };
