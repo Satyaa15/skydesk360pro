@@ -195,16 +195,21 @@ def create_order_batch(
         if not seat.is_available or seat.id in locked_seat_ids:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Seat {seat.code} is not available")
 
-    existing_user_booking = session.exec(
+    # Cancel any stale PENDING bookings for this user+seats (from abandoned payment attempts)
+    stale_pending = session.exec(
         select(Booking).where(
             Booking.user_id == current_user.id,
             Booking.seat_id.in_(body.seat_ids),
-            Booking.status.in_([BookingStatus.PENDING, BookingStatus.PAID]),
+            Booking.status == BookingStatus.PENDING,
         )
-    ).first()
-    if existing_user_booking:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You already have an active booking for one of these seats")
+    ).all()
+    for stale in stale_pending:
+        stale.status = BookingStatus.CANCELLED
+        session.add(stale)
+    if stale_pending:
+        session.commit()
 
+    # Still block if seat is PAID by any user
     seat_already_paid = session.exec(
         select(Booking).where(
             Booking.seat_id.in_(body.seat_ids),
@@ -212,7 +217,7 @@ def create_order_batch(
         )
     ).first()
     if seat_already_paid:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="One or more seats have already been booked")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="One or more seats have already been paid and booked")
 
     booking_ids: list[str] = []
     total_amount = 0.0

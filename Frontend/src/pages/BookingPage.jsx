@@ -28,11 +28,21 @@ const DURATION_OPTIONS = [
   { id: 'yearly', label: 'Yearly' },
 ];
 
-const computeDurationPrice = (basePrice, durationUnit) => {
-  if (durationUnit === 'hourly') return basePrice / 30 / 24;
-  if (durationUnit === 'daily') return basePrice / 30;
-  if (durationUnit === 'yearly') return basePrice * 12 * 0.9;
-  return basePrice;
+// Matches backend pricing.SEAT_PRICES — must stay in sync with pricing.py
+const SEAT_PRICES = {
+  workstation:  { hourly: 100,  daily: 400,   monthly: 7000  },
+  cabin:        { hourly: 400,  daily: 2500,  monthly: 35000 },
+  conference:   { hourly: 550,  daily: 4500,  monthly: 60000 },
+  meeting_room: { hourly: 550,  daily: 4500,  monthly: 60000 },
+};
+
+const computeDurationPrice = (workspaceType, durationUnit, quantity = 1) => {
+  const prices = SEAT_PRICES[workspaceType] || SEAT_PRICES.workstation;
+  const rate = durationUnit === 'hourly' ? prices.hourly
+    : durationUnit === 'daily'   ? prices.daily
+    : durationUnit === 'yearly'  ? prices.monthly * 12 * 0.9
+    : prices.monthly;
+  return rate * quantity;
 };
 
 const formatPrice = (value) => {
@@ -348,6 +358,7 @@ const BookingPage = () => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [durationUnit, setDurationUnit] = useState('monthly');
+  const [durationQuantity, setDurationQuantity] = useState(1);
   const [backendSeats, setBackendSeats] = useState([]);
   const [seatError, setSeatError] = useState('');
   const [loadingSeats, setLoadingSeats] = useState(true);
@@ -414,9 +425,9 @@ const BookingPage = () => {
       : enrichedSeats.filter((s) => s.workspaceType === activeFilter);
     return filtered.map((seat) => ({
       ...seat,
-      displayPrice: computeDurationPrice(seat.price, durationUnit),
+      displayPrice: computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity),
     }));
-  }, [activeFilter, enrichedSeats, durationUnit]);
+  }, [activeFilter, enrichedSeats, durationUnit, durationQuantity]);
 
   const workspaceStats = useMemo(() => {
     const seatTotal = enrichedSeats.length;
@@ -434,8 +445,8 @@ const BookingPage = () => {
   const removeSeat = (seatId) => setSelectedSeats((prev) => prev.filter((s) => s.id !== seatId));
   const isSeatSelected = useCallback((seatId) => selectedSeats.some((s) => s.id === seatId), [selectedSeats]);
   const totalPrice = useMemo(
-    () => selectedSeats.reduce((sum, s) => sum + computeDurationPrice(s.price, durationUnit), 0),
-    [selectedSeats, durationUnit]
+    () => selectedSeats.reduce((sum, s) => sum + computeDurationPrice(s.workspaceType, durationUnit, durationQuantity), 0),
+    [selectedSeats, durationUnit, durationQuantity]
   );
   const selectionBreakdown = useMemo(() =>
     selectedSeats.reduce((acc, s) => { acc[s.workspaceType] = (acc[s.workspaceType] || 0) + 1; return acc; }, {}),
@@ -444,7 +455,7 @@ const BookingPage = () => {
 
   const handleProceed = () => {
     navigate('/payment', {
-      state: { seats: selectedSeats, total: totalPrice, durationUnit, floor: '14th Floor - SkyDesk360 Baner Layout' },
+      state: { seats: selectedSeats, total: totalPrice, durationUnit, durationQuantity, floor: '14th Floor - SkyDesk360 Baner Layout' },
     });
   };
 
@@ -600,11 +611,32 @@ const BookingPage = () => {
                 <button
                   key={option.id}
                   className={`bp-duration-btn ${durationUnit === option.id ? 'active' : ''}`}
-                  onClick={() => setDurationUnit(option.id)}
+                  onClick={() => { setDurationUnit(option.id); setDurationQuantity(1); }}
                 >
                   {option.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Quantity selector */}
+          <div className="bp-duration" style={{ marginTop: '0.75rem' }}>
+            <div className="bp-duration-label">
+              {durationUnit === 'hourly' ? 'Number of Hours' : durationUnit === 'daily' ? 'Number of Days' : durationUnit === 'monthly' ? 'Number of Months' : 'Number of Years'}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <button
+                onClick={() => setDurationQuantity((q) => Math.max(1, q - 1))}
+                style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#94a3b8', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >−</button>
+              <span style={{ minWidth: '32px', textAlign: 'center', fontSize: '1rem', fontWeight: 800, color: '#e2e8f0' }}>{durationQuantity}</span>
+              <button
+                onClick={() => setDurationQuantity((q) => Math.min(durationUnit === 'hourly' ? 24 : durationUnit === 'daily' ? 30 : 12, q + 1))}
+                style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid rgba(0,242,254,0.3)', background: 'rgba(0,242,254,0.06)', color: '#00f2fe', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >+</button>
+              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                {durationUnit === 'hourly' ? 'hr(s)' : durationUnit === 'daily' ? 'day(s)' : durationUnit === 'monthly' ? 'mo(s)' : 'yr(s)'}
+              </span>
             </div>
           </div>
 
@@ -637,7 +669,7 @@ const BookingPage = () => {
                           <span className="bp-seat-type">{WORKSPACE_LABELS[seat.workspaceType]}</span>
                         </div>
                         <div className="bp-seat-actions">
-                          <span className="bp-seat-price">₹{formatPrice(computeDurationPrice(seat.price, durationUnit))}</span>
+                          <span className="bp-seat-price">₹{formatPrice(computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity))}</span>
                           <button className="bp-remove-btn" onClick={() => removeSeat(seat.id)} title="Remove"><X size={13} /></button>
                         </div>
                       </motion.div>
@@ -658,7 +690,7 @@ const BookingPage = () => {
                   <span className="bp-total-amount">₹{formatPrice(totalPrice)}</span>
                 </div>
 
-                <div className="bp-duration-summary">Billing: {durationUnit.charAt(0).toUpperCase() + durationUnit.slice(1)}</div>
+                <div className="bp-duration-summary">Billing: {durationQuantity} × {durationUnit.charAt(0).toUpperCase() + durationUnit.slice(1)}</div>
               </>
             )}
 

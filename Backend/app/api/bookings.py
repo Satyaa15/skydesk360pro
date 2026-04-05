@@ -54,15 +54,19 @@ def create_booking(
     if active_booking:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seat already booked for the selected time")
 
-    existing_user_booking = session.exec(
+    # Cancel stale PENDING bookings for this user+seat (from abandoned payments)
+    stale_pending = session.exec(
         select(Booking).where(
             Booking.user_id == current_user.id,
             Booking.seat_id == seat_id,
-            Booking.status.in_([BookingStatus.PENDING, BookingStatus.PAID]),
+            Booking.status == BookingStatus.PENDING,
         )
-    ).first()
-    if existing_user_booking:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You already have an active booking for this seat")
+    ).all()
+    for stale in stale_pending:
+        stale.status = BookingStatus.CANCELLED
+        session.add(stale)
+    if stale_pending:
+        session.commit()
 
     seat_already_paid = session.exec(
         select(Booking).where(
@@ -71,7 +75,7 @@ def create_booking(
         )
     ).first()
     if seat_already_paid:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seat has already been booked")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seat has already been paid and booked")
     
     # Create pending booking
     booking_amount = compute_amount(seat.type, body.duration_unit, body.duration_quantity)

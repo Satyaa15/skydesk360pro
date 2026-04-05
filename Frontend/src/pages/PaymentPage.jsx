@@ -9,11 +9,21 @@ import { createPaymentOrderBatch, verifyPayment } from '../lib/api';
 
 const DURATION_LABELS = { hourly: 'Hourly', daily: 'Daily', monthly: 'Monthly', yearly: 'Yearly' };
 
-const computeDurationPrice = (basePrice, durationUnit) => {
-  if (durationUnit === 'hourly') return basePrice / 30 / 24;
-  if (durationUnit === 'daily') return basePrice / 30;
-  if (durationUnit === 'yearly') return basePrice * 12 * 0.9;
-  return basePrice;
+// Must stay in sync with backend pricing.SEAT_PRICES
+const SEAT_PRICES = {
+  workstation:  { hourly: 100,  daily: 400,   monthly: 7000  },
+  cabin:        { hourly: 400,  daily: 2500,  monthly: 35000 },
+  conference:   { hourly: 550,  daily: 4500,  monthly: 60000 },
+  meeting_room: { hourly: 550,  daily: 4500,  monthly: 60000 },
+};
+
+const computeDurationPrice = (workspaceType, durationUnit, quantity = 1) => {
+  const prices = SEAT_PRICES[workspaceType] || SEAT_PRICES.workstation;
+  const rate = durationUnit === 'hourly' ? prices.hourly
+    : durationUnit === 'daily'   ? prices.daily
+    : durationUnit === 'yearly'  ? prices.monthly * 12 * 0.9
+    : prices.monthly;
+  return rate * quantity;
 };
 
 const formatPrice = (value) => {
@@ -59,8 +69,8 @@ const onBlur  = (e) => { e.target.style.borderColor = 'rgba(255,255,255,0.07)'; 
 const PaymentPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { seats = [], durationUnit = 'monthly' } = location.state || {};
-  const total = seats.reduce((sum, seat) => sum + computeDurationPrice(seat.price, durationUnit), 0);
+  const { seats = [], durationUnit = 'monthly', durationQuantity = 1 } = location.state || {};
+  const total = seats.reduce((sum, seat) => sum + computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity), 0);
 
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [showSuccess, setShowSuccess] = useState(false);
@@ -100,7 +110,7 @@ const PaymentPage = () => {
     try {
       const seatIds = seats.map((s) => s.dbId).filter(Boolean);
       if (!seatIds.length) throw new Error('No seats linked to database.');
-      const order = await createPaymentOrderBatch({ seat_ids: seatIds, duration_unit: durationUnit, duration_quantity: 1 });
+      const order = await createPaymentOrderBatch({ seat_ids: seatIds, duration_unit: durationUnit, duration_quantity: durationQuantity });
       const loaded = await loadRazorpayScript();
       if (!loaded) throw new Error('Failed to load Razorpay checkout.');
       const options = {
@@ -108,7 +118,7 @@ const PaymentPage = () => {
         amount: order.amount,
         currency: order.currency,
         name: 'SkyDesk Pro',
-        description: `${seatIds.length} seat(s) — ${DURATION_LABELS[durationUnit] || 'Monthly'}`,
+        description: `${seatIds.length} seat(s) — ${durationQuantity} × ${DURATION_LABELS[durationUnit] || 'Monthly'}`,
         order_id: order.razorpay_order_id,
         prefill: { name: user?.full_name || '', email: user?.email || '' },
         theme: { color: '#00f2fe' },
