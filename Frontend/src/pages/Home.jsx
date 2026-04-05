@@ -341,7 +341,7 @@ const Home = () => {
           {/* CTA */}
           <motion.div
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }}
-            style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}
+            style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'nowrap', justifyContent: 'center', paddingBottom: '4rem' }}
           >
             <button
               onClick={() => navigate(isLoggedIn ? '/book' : '/signin')}
@@ -379,12 +379,11 @@ const Home = () => {
           {/* Scroll hint */}
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }}
-            style={{ position: 'absolute', bottom: '2.5rem', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}
+            style={{ position: 'absolute', bottom: '2rem', left: '50%', transform: 'translateX(-50%)' }}
           >
-            <span style={{ fontSize: '0.5rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#1e293b' }}>Scroll</span>
             <motion.div
               animate={{ y: [0, 8, 0] }} transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-              style={{ width: '1px', height: '40px', background: 'linear-gradient(to bottom, rgba(0,242,254,0.3), transparent)' }}
+              style={{ width: '1px', height: '36px', background: 'linear-gradient(to bottom, rgba(0,242,254,0.25), transparent)' }}
             />
           </motion.div>
         </motion.div>
