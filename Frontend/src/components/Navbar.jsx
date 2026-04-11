@@ -20,6 +20,8 @@ export default function Navbar() {
   const navigate = useNavigate();
   const isHome = location.pathname === '/';
   const user = getStoredUser();
+
+  if (location.pathname === '/signin' || location.pathname === '/register') return null;
   const isAdmin = user?.role?.toLowerCase?.() === 'admin';
 
   useEffect(() => {
