@@ -21,6 +21,8 @@ WORKDIR /app
 RUN npm install -g serve
 
 COPY --from=builder /app/dist ./dist
+# Place serve.json at the working directory so serve picks it up
+COPY --from=builder /app/dist/serve.json ./serve.json
 
 EXPOSE 4173
 
