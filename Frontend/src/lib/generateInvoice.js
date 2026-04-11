@@ -35,10 +35,7 @@ function unitRate(workspaceType, durationUnit) {
   return p.monthly;
 }
 
-/**
- * Draw a left→right gradient bar.
- * fromRgb / toRgb = [r, g, b]
- */
+/** Draw a left→right gradient bar. fromRgb / toRgb = [r, g, b] */
 function gradientRect(doc, x, y, w, h, fromRgb, toRgb) {
   for (let i = 0; i <= w; i++) {
     const t = i / w;
@@ -52,48 +49,45 @@ function gradientRect(doc, x, y, w, h, fromRgb, toRgb) {
 }
 
 // ── Main export ────────────────────────────────────────────────────────────
-/**
- * @param {object} opts
- * @param {{ fullName?: string; full_name?: string; name?: string; email?: string }} opts.user
- * @param {Array<{ id: string; zone: string; workspaceType: string }>} opts.seats
- * @param {string}   opts.durationUnit      – 'hourly' | 'daily' | 'monthly' | 'yearly'
- * @param {number}   opts.durationQuantity  – multiplier (e.g. 3 months)
- * @param {string[]} opts.bookingIds        – backend booking IDs
- * @param {number}   opts.total             – total amount paid (INR)
- */
 export function generateInvoice({ user, seats, durationUnit, durationQuantity, bookingIds, total }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  const W = 210;
-  const H = 297;
-  const ML = 14;   // margin left
-  const MR = 14;   // margin right
+  const W  = 210;
+  const H  = 297;
+  const ML = 14;
+  const MR = 14;
   const IW = W - ML - MR;
 
-  const CYAN    = [0, 210, 230];
-  const PURPLE  = [168, 85, 247];
-  const WHITE   = [226, 232, 240];
-  const GRAY1   = [100, 116, 139];
-  const GRAY2   = [71, 85, 105];
-  const GRAY3   = [30, 41, 59];
-  const GREEN   = [34, 197, 94];
-  const BG_CARD = [10, 18, 36];
-  const BG_ROW0 = [5, 10, 22];
-  const BG_ROW1 = [8, 16, 32];
+  // ── Light-mode colour palette ─────────────────────────────────────────────
+  const CYAN        = [0,  190, 215];   // slightly deepened for readability on white
+  const PURPLE      = [140, 60, 220];   // slightly deepened purple
+  const HEADING     = [15,  23,  42];   // near-black navy  — primary text
+  const BODY        = [51,  65,  85];   // dark slate       — secondary text
+  const MUTED       = [100, 116, 139];  // medium gray      — labels / meta
+  const SUBTLE      = [148, 163, 184];  // light gray       — hints / PRO badge
+  const DIVIDER     = [226, 232, 240];  // very light gray  — rules / row borders
+  const GREEN       = [22,  163,  74];  // slightly darker green for white bg
+  const BG_PAGE     = [255, 255, 255];  // white
+  const BG_HEADER   = [241, 248, 252];  // pale cyan-gray   — table header row
+  const BG_ROW_ALT  = [248, 250, 253];  // off-white        — alternating rows
+  const BG_REF_BOX  = [236, 252, 255];  // pale cyan        — booking reference box
+  const BG_TOT_BOX  = [236, 252, 255];  // pale cyan        — total box
+  const BG_BADGE    = [240, 253, 244];  // pale green       — status badge
 
-  // ── Background ────────────────────────────────────────────────────────────
-  doc.setFillColor(2, 2, 4);
+  // ── White background ──────────────────────────────────────────────────────
+  doc.setFillColor(...BG_PAGE);
   doc.rect(0, 0, W, H, 'F');
 
-  // ── Top gradient accent bar ───────────────────────────────────────────────
-  gradientRect(doc, 0, 0, W, 4, CYAN, PURPLE);
+  // ── Top gradient accent bar (cyan → purple) ───────────────────────────────
+  gradientRect(doc, 0, 0, W, 5, CYAN, PURPLE);
 
   // ── Logo ─────────────────────────────────────────────────────────────────
-  let y = 20;
+  let y = 21;
   doc.setFont('helvetica', 'bolditalic');
   doc.setFontSize(22);
 
-  doc.setTextColor(...WHITE);
+  // "SKY" in dark heading colour (visible on white)
+  doc.setTextColor(...HEADING);
   doc.text('SKY', ML, y);
   const wSky = doc.getTextWidth('SKY');
 
@@ -108,13 +102,13 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
   // PRO superscript
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5);
-  doc.setTextColor(...GRAY3);
+  doc.setTextColor(...SUBTLE);
   doc.text('PRO', ML + wSky + wDesk + w360 + 1.5, y - 5.5);
 
   // Tagline
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6);
-  doc.setTextColor(...GRAY2);
+  doc.setTextColor(...MUTED);
   doc.text('PREMIUM COWORKING SPACE  ·  14TH FLOOR  ·  BANGALORE', ML, y + 5.5);
 
   // ── TAX INVOICE (right-aligned) ───────────────────────────────────────────
@@ -127,26 +121,26 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.setTextColor(...WHITE);
+  doc.setTextColor(...HEADING);
   doc.text('TAX INVOICE', W - MR, y - 2, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.setTextColor(...GRAY1);
-  doc.text(`Invoice No: ${invoiceNo}`, W - MR, y + 5, { align: 'right' });
-  doc.text(`Date: ${dateStr}`, W - MR, y + 10, { align: 'right' });
+  doc.setTextColor(...MUTED);
+  doc.text(`Invoice No: ${invoiceNo}`, W - MR, y + 5,  { align: 'right' });
+  doc.text(`Date: ${dateStr}`,         W - MR, y + 10, { align: 'right' });
 
   // ── Divider ───────────────────────────────────────────────────────────────
-  y = 35;
-  doc.setDrawColor(...GRAY3);
-  doc.setLineWidth(0.3);
+  y = 36;
+  doc.setDrawColor(...DIVIDER);
+  doc.setLineWidth(0.4);
   doc.line(ML, y, W - MR, y);
 
   // ── FROM / BILL TO ────────────────────────────────────────────────────────
   y = 44;
   const col2X = W / 2 + 5;
 
-  // FROM
+  // FROM label
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6);
   doc.setTextColor(...CYAN);
@@ -154,20 +148,16 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
-  doc.setTextColor(...WHITE);
+  doc.setTextColor(...HEADING);
   doc.text('SkyDesk360 Pro', ML, y + 6.5);
 
-  const fromLines = [
-    '14th Floor, Prestige Tech Park',
-    'Bangalore, Karnataka — 560103',
-    'support@skydesk360.com',
-  ];
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.setTextColor(...GRAY1);
-  fromLines.forEach((line, i) => doc.text(line, ML, y + 12.5 + i * 5.5));
+  doc.setTextColor(...MUTED);
+  ['14th Floor, Prestige Tech Park', 'Bangalore, Karnataka — 560103', 'support@skydesk360.com']
+    .forEach((line, i) => doc.text(line, ML, y + 12.5 + i * 5.5));
 
-  // BILL TO
+  // BILL TO label
   const memberName = user?.fullName || user?.full_name || user?.name || 'Member';
 
   doc.setFont('helvetica', 'bold');
@@ -177,29 +167,27 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
-  doc.setTextColor(...WHITE);
+  doc.setTextColor(...HEADING);
   doc.text(memberName, col2X, y + 6.5);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.setTextColor(...GRAY1);
-  doc.text(user?.email || '', col2X, y + 12.5);
-  doc.text('SkyDesk360 Member', col2X, y + 18);
+  doc.setTextColor(...MUTED);
+  doc.text(user?.email || '',     col2X, y + 12.5);
+  doc.text('SkyDesk360 Member',   col2X, y + 18);
 
   // ── Booking reference box ─────────────────────────────────────────────────
   y = 76;
-  const boxW = 90;
-  const boxH = 14;
-  const boxX = (W - boxW) / 2;
+  const boxW = 90, boxH = 14, boxX = (W - boxW) / 2;
 
-  doc.setFillColor(...BG_CARD);
-  doc.setDrawColor(0, 150, 180);
-  doc.setLineWidth(0.4);
+  doc.setFillColor(...BG_REF_BOX);
+  doc.setDrawColor(...CYAN);
+  doc.setLineWidth(0.5);
   doc.roundedRect(boxX, y, boxW, boxH, 3, 3, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5.5);
-  doc.setTextColor(...GRAY2);
+  doc.setTextColor(...MUTED);
   doc.text('BOOKING REFERENCE', W / 2, y + 4.5, { align: 'center' });
 
   doc.setFontSize(8.5);
@@ -211,65 +199,64 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
 
   // ── Section separator ─────────────────────────────────────────────────────
   y = 97;
-  doc.setDrawColor(...GRAY3);
-  doc.setLineWidth(0.3);
+  doc.setDrawColor(...DIVIDER);
+  doc.setLineWidth(0.4);
   doc.line(ML, y, W - MR, y);
 
   // ── Table ─────────────────────────────────────────────────────────────────
   y = 101;
   const rowH = 9.5;
 
-  // Column left-edges
   const COL = {
     seat:      ML,
     zone:      ML + 34,
     type:      ML + 60,
-    period:    ML + 105,
-    unitPrice: ML + 140,
-    amount:    W - MR,  // right-aligned
+    period:    ML + 110,
+    unitPrice: ML + 142,
+    amount:    W - MR,
   };
 
-  // Header background
-  doc.setFillColor(12, 22, 44);
+  // Header row
+  doc.setFillColor(...BG_HEADER);
   doc.rect(ML, y, IW, rowH, 'F');
-  // Cyan top-border for header
-  doc.setFillColor(...CYAN);
-  doc.rect(ML, y, IW, 0.6, 'F');
+
+  // Cyan accent bar on top of header
+  gradientRect(doc, ML, y, IW, 0.7, CYAN, PURPLE);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5.8);
-  doc.setTextColor(...GRAY2);
-  const headers = [
+  doc.setTextColor(...BODY);
+  [
     { label: 'SEAT ID',        x: COL.seat + 2,      align: 'left'  },
     { label: 'ZONE',           x: COL.zone + 2,      align: 'left'  },
     { label: 'WORKSPACE TYPE', x: COL.type + 2,      align: 'left'  },
     { label: 'BILLING PERIOD', x: COL.period + 2,    align: 'left'  },
     { label: 'UNIT PRICE',     x: COL.unitPrice + 2, align: 'left'  },
     { label: 'AMOUNT',         x: COL.amount - 2,    align: 'right' },
-  ];
-  headers.forEach(({ label, x, align }) =>
-    doc.text(label, x, y + rowH - 3, { align })
-  );
+  ].forEach(({ label, x, align }) => doc.text(label, x, y + rowH - 3, { align }));
 
   y += rowH;
 
   // Data rows
   seats.forEach((seat, i) => {
-    const rowY = y + i * rowH;
+    const rowY  = y + i * rowH;
+    const textY = rowY + rowH - 3;
 
-    doc.setFillColor(...(i % 2 === 0 ? BG_ROW0 : BG_ROW1));
-    doc.rect(ML, rowY, IW, rowH, 'F');
+    // Alternating row background
+    if (i % 2 !== 0) {
+      doc.setFillColor(...BG_ROW_ALT);
+      doc.rect(ML, rowY, IW, rowH, 'F');
+    }
 
-    // Row separator
-    doc.setDrawColor(18, 28, 50);
+    // Row bottom separator
+    doc.setDrawColor(...DIVIDER);
     doc.setLineWidth(0.2);
     doc.line(ML, rowY + rowH, W - MR, rowY + rowH);
 
-    const wType    = seat.workspaceType || 'workstation';
-    const rate1    = unitRate(wType, durationUnit);
-    const seatAmt  = rate1 * durationQuantity;
-    const period   = `${durationQuantity} x ${DURATION_LABELS[durationUnit] || 'Monthly'}`;
-    const textY    = rowY + rowH - 3;
+    const wType   = seat.workspaceType || 'workstation';
+    const rate1   = unitRate(wType, durationUnit);
+    const seatAmt = rate1 * durationQuantity;
+    const period  = `${durationQuantity} x ${DURATION_LABELS[durationUnit] || 'Monthly'}`;
 
     // Seat ID — cyan + bold
     doc.setFont('helvetica', 'bold');
@@ -277,19 +264,18 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
     doc.setTextColor(...CYAN);
     doc.text(seat.id || '—', COL.seat + 2, textY);
 
-    // Other text columns
+    // Rest of columns — dark body text
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
-    doc.setTextColor(...[WHITE[0] - 30, WHITE[1] - 30, WHITE[2] - 30]);  // slightly muted
+    doc.setTextColor(...BODY);
+    doc.text(seat.zone || '—',               COL.zone + 2,      textY);
+    doc.text(TYPE_LABELS[wType] || wType,     COL.type + 2,      textY);
+    doc.text(period,                          COL.period + 2,    textY);
+    doc.text(fmtPrice(rate1),                 COL.unitPrice + 2, textY);
 
-    doc.text(seat.zone || '—',                  COL.zone + 2,      textY);
-    doc.text(TYPE_LABELS[wType] || wType,        COL.type + 2,      textY);
-    doc.text(period,                             COL.period + 2,    textY);
-    doc.text(fmtPrice(rate1),                   COL.unitPrice + 2, textY);
-
-    // Amount — white bold, right-aligned
+    // Amount — heading colour, bold, right-aligned
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...WHITE);
+    doc.setTextColor(...HEADING);
     doc.text(fmtPrice(seatAmt), COL.amount - 2, textY, { align: 'right' });
   });
 
@@ -300,34 +286,34 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.setTextColor(...GRAY1);
+  doc.setTextColor(...MUTED);
   doc.text('Subtotal', totX, y);
-  doc.setTextColor(...WHITE);
+  doc.setTextColor(...HEADING);
   doc.text(fmtPrice(total), W - MR, y, { align: 'right' });
 
   y += 6.5;
-  doc.setTextColor(...GRAY1);
+  doc.setTextColor(...MUTED);
   doc.text('GST & Applicable Taxes', totX, y);
   doc.text('Inclusive', W - MR, y, { align: 'right' });
 
   y += 5;
-  doc.setDrawColor(...GRAY3);
-  doc.setLineWidth(0.3);
+  doc.setDrawColor(...DIVIDER);
+  doc.setLineWidth(0.4);
   doc.line(totX, y, W - MR, y);
 
   y += 9;
   const tBoxH = 17;
   const tBoxW = W - MR - totX;
 
-  // Total box with cyan border
-  doc.setFillColor(...BG_CARD);
+  // Total box — pale cyan fill with cyan border
+  doc.setFillColor(...BG_TOT_BOX);
   doc.setDrawColor(...CYAN);
-  doc.setLineWidth(0.6);
+  doc.setLineWidth(0.7);
   doc.roundedRect(totX, y - 5, tBoxW, tBoxH, 3, 3, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6);
-  doc.setTextColor(...GRAY2);
+  doc.setTextColor(...MUTED);
   doc.text('TOTAL AMOUNT PAID', totX + 4, y + 1);
 
   doc.setFontSize(13);
@@ -338,9 +324,9 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
 
   // ── Payment status badge ──────────────────────────────────────────────────
   const badgeW = 62;
-  doc.setFillColor(5, 28, 15);
+  doc.setFillColor(...BG_BADGE);
   doc.setDrawColor(...GREEN);
-  doc.setLineWidth(0.4);
+  doc.setLineWidth(0.5);
   doc.roundedRect(ML, y - 4, badgeW, 11, 2.5, 2.5, 'FD');
 
   doc.setFont('helvetica', 'bold');
@@ -351,7 +337,7 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
   y += 13;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.setTextColor(...GRAY2);
+  doc.setTextColor(...MUTED);
   doc.text(`Paid via Razorpay   ·   ${dateStr}`, ML, y);
   doc.text(
     `${seats.length} seat${seats.length > 1 ? 's' : ''} booked   ·   ${DURATION_LABELS[durationUnit] || 'Monthly'} plan`,
@@ -360,23 +346,30 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
 
   // ── Footer ───────────────────────────────────────────────────────────────
   const footerY = H - 22;
-  gradientRect(doc, 0, footerY, W, 0.5, CYAN, PURPLE);
+
+  // Light gray separator
+  doc.setDrawColor(...DIVIDER);
+  doc.setLineWidth(0.4);
+  doc.line(ML, footerY, W - MR, footerY);
+
+  // Thin gradient accent line below divider
+  gradientRect(doc, 0, footerY + 1, W, 0.6, CYAN, PURPLE);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.setTextColor(...WHITE);
-  doc.text('Thank you for choosing SkyDesk360 Pro!', W / 2, footerY + 6.5, { align: 'center' });
+  doc.setTextColor(...HEADING);
+  doc.text('Thank you for choosing SkyDesk360 Pro!', W / 2, footerY + 7, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6);
-  doc.setTextColor(...GRAY3);
+  doc.setTextColor(...MUTED);
   doc.text(
     'This is a computer-generated invoice and does not require a physical signature.',
-    W / 2, footerY + 12, { align: 'center' }
+    W / 2, footerY + 12.5, { align: 'center' }
   );
   doc.text(
     'For support: support@skydesk360.com  |  skydesk360.com',
-    W / 2, footerY + 17, { align: 'center' }
+    W / 2, footerY + 17.5, { align: 'center' }
   );
 
   // ── Save ─────────────────────────────────────────────────────────────────
