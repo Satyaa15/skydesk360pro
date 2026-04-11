@@ -18,11 +18,6 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const isHome = location.pathname === '/';
-  const user = getStoredUser();
-
-  if (location.pathname === '/signin' || location.pathname === '/register') return null;
-  const isAdmin = user?.role?.toLowerCase?.() === 'admin';
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 30);
@@ -31,6 +26,12 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => setMobileOpen(false), [location]);
+
+  const isHome = location.pathname === '/';
+  const user = getStoredUser();
+  const isAdmin = user?.role?.toLowerCase?.() === 'admin';
+
+  if (location.pathname === '/signin' || location.pathname === '/register') return null;
 
   const handleLogout = () => {
     clearAuthSession();
