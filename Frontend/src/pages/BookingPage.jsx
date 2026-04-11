@@ -324,12 +324,14 @@ const FloorPlanSVG = React.memo(({ visibleSeats, isSeatSelected, toggleSeat, hov
               <text x={cx} y={cy - 7} className="tooltip-price">₹{formatPrice(seat.displayPrice ?? seat.price)}/{durationUnit}</text>
             </g>
           )}
-          {/* Hover tooltip — permanently booked */}
+          {/* Hover tooltip — admin locked or booked */}
           {isHovered && seat.booked && (
             <g className="seat-tooltip-group">
-              <rect x={cx - 30} y={cy - 30} width="60" height="20" rx="5"
+              <rect x={cx - 42} y={cy - 30} width="84" height="20" rx="5"
                 fill="rgba(127,29,29,0.92)" stroke="rgba(239,68,68,0.3)" strokeWidth="0.8" />
-              <text x={cx} y={cy - 16} className="tooltip-booked">UNAVAILABLE</text>
+              <text x={cx} y={cy - 16} className="tooltip-booked">
+                {seat.adminLocked ? '🔒 LOCKED BY ADMIN' : 'UNAVAILABLE'}
+              </text>
             </g>
           )}
           {/* Hover tooltip — time-locked */}
@@ -406,6 +408,7 @@ const BookingPage = () => {
         return { ...seat, booked: true, locked: false, lockedUntil: null, dbId: null, backendAvailable: false };
       }
       const isLocked = !!backendSeat.locked_until;
+      const isAdminLocked = !backendSeat.is_available && !isLocked;
       return {
         ...seat,
         dbId: backendSeat.id,
@@ -413,6 +416,7 @@ const BookingPage = () => {
         price: backendSeat.price,
         booked: !backendSeat.is_available && !isLocked,
         locked: isLocked,
+        adminLocked: isAdminLocked,
         lockedUntil: backendSeat.locked_until ? new Date(backendSeat.locked_until) : null,
         backendAvailable: backendSeat.is_available,
       };

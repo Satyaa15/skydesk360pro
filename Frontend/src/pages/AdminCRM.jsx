@@ -17,8 +17,8 @@ import {
   Pencil,
   Save,
   X as CloseIcon,
-  ToggleLeft,
-  ToggleRight,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import {
   fetchAdminStats,
@@ -172,7 +172,7 @@ const AdminCRM = () => {
     try {
       const updated = await updateAdminSeat(seat.id, { is_available: !seat.is_available });
       setSeats((prev) => prev.map((s) => (s.id === seat.id ? updated : s)));
-      setSeatActionSuccess(`Seat ${updated.code} is now ${updated.is_available ? 'available' : 'unavailable'}.`);
+      setSeatActionSuccess(`Seat ${updated.code} ${updated.is_available ? 'unlocked — now visible & bookable by users.' : 'locked — hidden from user booking map.'} `);
       loadData();
     } catch (err) {
       setSeatActionError(err.message || 'Failed to update availability');
@@ -557,55 +557,79 @@ const AdminCRM = () => {
                             `₹${seat.price.toLocaleString()}`
                           )}
                         </td>
+                        {/* ── Status badge (read-only) ── */}
                         <td className="px-8 py-5">
                           {seat.is_locked ? (
                             <div className="flex flex-col gap-1">
-                              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black tracking-widest border bg-orange-500/10 border-orange-500/20 text-orange-300">
-                                <Clock size={12} /> LOCKED
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black tracking-widest border bg-orange-500/10 border-orange-500/20 text-orange-300">
+                                <Clock size={10} /> BOOKING LOCKED
                               </span>
                               {seat.locked_until && (
-                                <span className="text-[10px] text-orange-200/70">
-                                  Until {new Date(seat.locked_until).toLocaleString('en-IN')}
+                                <span className="text-[10px] text-orange-200/60">
+                                  Until {new Date(seat.locked_until).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               )}
                             </div>
+                          ) : seat.is_available ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black tracking-widest border bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+                              <CheckCircle size={10} /> AVAILABLE
+                            </span>
                           ) : (
-                            <button
-                              onClick={() => handleToggleAvailability(seat)}
-                              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black tracking-widest border ${
-                                seat.is_available
-                                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                  : 'bg-red-500/10 border-red-500/20 text-red-400'
-                              }`}
-                            >
-                              {seat.is_available ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
-                              {seat.is_available ? 'AVAILABLE' : 'BLOCKED'}
-                            </button>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black tracking-widest border bg-red-500/10 border-red-500/20 text-red-400">
+                              <Lock size={10} /> ADMIN LOCKED
+                            </span>
                           )}
                         </td>
+
+                        {/* ── Actions: Edit + Lock / Unlock ── */}
                         <td className="px-8 py-5">
                           {editingSeatId === seat.id ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                               <button
                                 onClick={handleSaveSeat}
-                                className="text-xs uppercase font-black tracking-widest text-emerald-400 flex items-center gap-1"
+                                className="text-xs uppercase font-black tracking-widest text-emerald-400 flex items-center gap-1 hover:text-emerald-300 transition-colors"
                               >
                                 <Save size={12} /> Save
                               </button>
                               <button
                                 onClick={cancelEditSeat}
-                                className="text-xs uppercase font-black tracking-widest text-gray-500 flex items-center gap-1"
+                                className="text-xs uppercase font-black tracking-widest text-gray-500 flex items-center gap-1 hover:text-gray-400 transition-colors"
                               >
                                 <CloseIcon size={12} /> Cancel
                               </button>
                             </div>
                           ) : (
-                            <button
-                              onClick={() => startEditSeat(seat)}
-                              className="text-xs uppercase font-black tracking-widest text-blue-400 flex items-center gap-1"
-                            >
-                              <Pencil size={12} /> Edit
-                            </button>
+                            <div className="flex items-center gap-4">
+                              <button
+                                onClick={() => startEditSeat(seat)}
+                                className="text-xs uppercase font-black tracking-widest text-blue-400 flex items-center gap-1 hover:text-blue-300 transition-colors"
+                              >
+                                <Pencil size={12} /> Edit
+                              </button>
+
+                              {/* Lock / Unlock — disabled during active booking lock */}
+                              {seat.is_locked ? (
+                                <span className="text-xs uppercase font-black tracking-widest text-gray-600 flex items-center gap-1 cursor-not-allowed" title="Cannot change while booking is in progress">
+                                  <Lock size={12} /> Locked
+                                </span>
+                              ) : seat.is_available ? (
+                                <button
+                                  onClick={() => handleToggleAvailability(seat)}
+                                  className="text-xs uppercase font-black tracking-widest text-red-400 flex items-center gap-1 hover:text-red-300 transition-colors"
+                                  title="Lock this seat — users will not be able to book it"
+                                >
+                                  <Lock size={12} /> Lock
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleToggleAvailability(seat)}
+                                  className="text-xs uppercase font-black tracking-widest text-emerald-400 flex items-center gap-1 hover:text-emerald-300 transition-colors"
+                                  title="Unlock this seat — users will be able to book it again"
+                                >
+                                  <Unlock size={12} /> Unlock
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>
