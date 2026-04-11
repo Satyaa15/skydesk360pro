@@ -6,6 +6,7 @@ import {
   Lock, Check, Shield, Sparkles
 } from 'lucide-react';
 import { createPaymentOrderBatch, verifyPayment } from '../lib/api';
+import { generateInvoice } from '../lib/generateInvoice';
 
 const DURATION_LABELS = { hourly: 'Hourly', daily: 'Daily', monthly: 'Monthly', yearly: 'Yearly' };
 
@@ -465,9 +466,30 @@ const PaymentPage = () => {
                 {bookingIds.length > 0 ? bookingIds.join(' · ') : createBookingId()}
               </div>
 
-              <p style={{ fontSize: '0.65rem', color: '#334155', marginBottom: '2rem' }}>
+              <p style={{ fontSize: '0.65rem', color: '#334155', marginBottom: '1.5rem' }}>
                 {seats.length} seat{seats.length > 1 ? 's' : ''} · ₹{formatPrice(total)} paid · {DURATION_LABELS[durationUnit]}
               </p>
+
+              {/* Download Receipt */}
+              <button
+                onClick={() => generateInvoice({ user, seats, durationUnit, durationQuantity, bookingIds, total })}
+                style={{
+                  width: '100%', padding: '0.9rem', borderRadius: '14px', border: '1px solid rgba(0,242,254,0.35)',
+                  background: 'rgba(0,242,254,0.06)',
+                  color: '#00f2fe', fontSize: '0.7rem', fontWeight: 900,
+                  textTransform: 'uppercase', letterSpacing: '0.18em',
+                  cursor: 'pointer', marginBottom: '0.75rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                  transition: 'all 0.25s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,242,254,0.12)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(0,242,254,0.06)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download Invoice
+              </button>
 
               <button
                 onClick={() => navigate('/')}
