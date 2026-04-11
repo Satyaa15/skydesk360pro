@@ -154,8 +154,11 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(...MUTED);
-  ['14th Floor, Prestige Tech Park', 'Bangalore, Karnataka — 560103', 'support@skydesk360.com']
-    .forEach((line, i) => doc.text(line, ML, y + 12.5 + i * 5.5));
+  [
+    '14th Floor, Maruti Millennium Tower',
+    'Pune Bangalore Highway, Baner, Pune — 411045',
+    'Mob: +91 73970 10324',
+  ].forEach((line, i) => doc.text(line, ML, y + 12.5 + i * 5.5));
 
   // BILL TO label
   const memberName = user?.fullName || user?.full_name || user?.name || 'Member';
@@ -368,7 +371,7 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
     W / 2, footerY + 12.5, { align: 'center' }
   );
   doc.text(
-    'For support: support@skydesk360.com  |  skydesk360.com',
+    'For support: +91 73970 10324  |  skydesk360.com',
     W / 2, footerY + 17.5, { align: 'center' }
   );
 
