@@ -48,6 +48,9 @@ const AdminCRM = () => {
   const [editingSeat, setEditingSeat] = useState({ code: '', type: 'workstation', section: '', price: '', is_available: true });
   const [newSeat, setNewSeat] = useState({ code: '', type: 'workstation', section: '', price: '', is_available: true });
 
+  // Confirmation dialog for destructive admin actions
+  const [confirmDialog, setConfirmDialog] = useState(null); // { seat, action: 'lock' | 'force-release' }
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -172,10 +175,25 @@ const AdminCRM = () => {
     try {
       const updated = await updateAdminSeat(seat.id, { is_available: !seat.is_available });
       setSeats((prev) => prev.map((s) => (s.id === seat.id ? updated : s)));
-      setSeatActionSuccess(`Seat ${updated.code} ${updated.is_available ? 'unlocked — now visible & bookable by users.' : 'locked — hidden from user booking map.'} `);
+      setSeatActionSuccess(`Seat ${updated.code} ${updated.is_available ? 'unlocked — now visible & bookable by users.' : 'locked — hidden from user booking map.'}`);
       loadData();
     } catch (err) {
       setSeatActionError(err.message || 'Failed to update availability');
+    }
+  };
+
+  // Force-release: overrides any lock type including active customer bookings
+  const handleForceRelease = async (seat) => {
+    setSeatActionError(null);
+    setSeatActionSuccess(null);
+    setConfirmDialog(null);
+    try {
+      const updated = await updateAdminSeat(seat.id, { is_available: true, locked_until: null });
+      setSeats((prev) => prev.map((s) => (s.id === seat.id ? updated : s)));
+      setSeatActionSuccess(`Seat ${updated.code} force-released by admin — seat is now open for booking.`);
+      loadData();
+    } catch (err) {
+      setSeatActionError(err.message || 'Failed to force-release seat');
     }
   };
 
@@ -581,7 +599,7 @@ const AdminCRM = () => {
                           )}
                         </td>
 
-                        {/* ── Actions: Edit + Lock / Unlock ── */}
+                        {/* ── Actions: Edit + Lock / Unlock / Force Release ── */}
                         <td className="px-8 py-5">
                           {editingSeatId === seat.id ? (
                             <div className="flex items-center gap-3">
@@ -607,24 +625,30 @@ const AdminCRM = () => {
                                 <Pencil size={12} /> Edit
                               </button>
 
-                              {/* Lock / Unlock — disabled during active booking lock */}
                               {seat.is_locked ? (
-                                <span className="text-xs uppercase font-black tracking-widest text-gray-600 flex items-center gap-1 cursor-not-allowed" title="Cannot change while booking is in progress">
-                                  <Lock size={12} /> Locked
-                                </span>
+                                /* Booking lock (payment in progress) — admin can force-release */
+                                <button
+                                  onClick={() => setConfirmDialog({ seat, action: 'force-release' })}
+                                  className="text-xs uppercase font-black tracking-widest text-orange-400 flex items-center gap-1 hover:text-orange-300 transition-colors"
+                                  title="Force-release this seat even though a booking is in progress"
+                                >
+                                  <Unlock size={12} /> Force Release
+                                </button>
                               ) : seat.is_available ? (
+                                /* Available — admin can lock */
                                 <button
                                   onClick={() => handleToggleAvailability(seat)}
                                   className="text-xs uppercase font-black tracking-widest text-red-400 flex items-center gap-1 hover:text-red-300 transition-colors"
-                                  title="Lock this seat — users will not be able to book it"
+                                  title="Lock seat — users will not be able to book it"
                                 >
                                   <Lock size={12} /> Lock
                                 </button>
                               ) : (
+                                /* Admin-locked or customer-booked — admin can unlock/release */
                                 <button
-                                  onClick={() => handleToggleAvailability(seat)}
+                                  onClick={() => setConfirmDialog({ seat, action: 'force-release' })}
                                   className="text-xs uppercase font-black tracking-widest text-emerald-400 flex items-center gap-1 hover:text-emerald-300 transition-colors"
-                                  title="Unlock this seat — users will be able to book it again"
+                                  title="Unlock this seat — overrides any existing booking or admin lock"
                                 >
                                   <Unlock size={12} /> Unlock
                                 </button>
@@ -650,6 +674,106 @@ const AdminCRM = () => {
           )}
         </div>
       </div>
+
+      {/* ── Confirmation Dialog ── */}
+      {confirmDialog && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(2,2,4,0.85)', backdropFilter: 'blur(18px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem',
+        }}>
+          <div style={{
+            width: '100%', maxWidth: '420px',
+            background: 'rgba(15,23,42,0.95)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '22px', padding: '2rem',
+            boxShadow: '0 40px 80px rgba(0,0,0,0.7)',
+            position: 'relative', overflow: 'hidden',
+          }}>
+            {/* Top accent */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #f97316, #ef4444)' }} />
+
+            {/* Warning icon */}
+            <div style={{
+              width: '52px', height: '52px', borderRadius: '14px', marginBottom: '1.25rem',
+              background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <AlertTriangle size={22} color="#f97316" />
+            </div>
+
+            <h3 style={{ fontSize: '1rem', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.01em', color: '#fff', marginBottom: '0.5rem' }}>
+              {confirmDialog.action === 'force-release' ? 'Force Release Seat?' : 'Confirm Action'}
+            </h3>
+
+            <p style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.65, marginBottom: '1rem' }}>
+              You are about to force-release{' '}
+              <span style={{ color: '#00f2fe', fontWeight: 700 }}>{confirmDialog.seat.code}</span>.
+            </p>
+
+            {/* Seat info card */}
+            <div style={{
+              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '1.25rem',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#334155' }}>Seat</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#e2e8f0' }}>{confirmDialog.seat.code}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#334155' }}>Type</span>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{(confirmDialog.seat.type || '').replace('_', ' ')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#334155' }}>Current State</span>
+                <span style={{ fontSize: '0.75rem', color: confirmDialog.seat.is_locked ? '#fb923c' : '#f87171', fontWeight: 700 }}>
+                  {confirmDialog.seat.is_locked ? 'Booking in Progress' : 'Locked / Booked'}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.7rem', color: '#475569', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+              ⚠️ This will immediately make the seat available for new bookings.{' '}
+              {confirmDialog.seat.is_locked
+                ? 'Any ongoing payment process for this seat will be invalidated.'
+                : 'Any existing customer booking records will NOT be automatically cancelled — handle refunds separately.'}
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => setConfirmDialog(null)}
+                style={{
+                  flex: 1, padding: '0.85rem', borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#64748b', fontSize: '0.65rem', fontWeight: 800,
+                  textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; e.currentTarget.style.color = '#94a3b8'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#64748b'; }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleForceRelease(confirmDialog.seat)}
+                style={{
+                  flex: 1, padding: '0.85rem', borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #f97316, #ef4444)',
+                  border: 'none', color: '#fff',
+                  fontSize: '0.65rem', fontWeight: 900,
+                  textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer',
+                  boxShadow: '0 4px 20px rgba(239,68,68,0.3)', transition: 'all 0.2s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 6px 30px rgba(239,68,68,0.5)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(239,68,68,0.3)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              >
+                <Unlock size={13} /> Force Release
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
