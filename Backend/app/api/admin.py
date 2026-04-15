@@ -232,6 +232,61 @@ def update_seat(seat_id: int, body: AdminSeatUpdate, session: Session = Depends(
     )
 
 
+class AdminKYCSummary(BaseModel):
+    id: str
+    full_name: str
+    email: str
+    mobile: str | None
+    gov_id_type: str
+    gov_id_number: str
+    occupation_sector: str | None
+    occupation_role: str | None
+    kyc_document_name: str | None
+    has_document: bool
+    created_at: datetime
+
+
+@router.get("/kyc", response_model=List[AdminKYCSummary])
+def get_kyc_list(session: Session = Depends(get_session)):
+    """Return all users with KYC metadata — excludes raw document bytes."""
+    users = session.exec(select(User)).all()
+    return [
+        AdminKYCSummary(
+            id=str(u.id),
+            full_name=u.full_name,
+            email=u.email,
+            mobile=u.mobile,
+            gov_id_type=u.gov_id_type,
+            gov_id_number=u.gov_id_number,
+            occupation_sector=u.occupation_sector,
+            occupation_role=u.occupation_role,
+            kyc_document_name=u.kyc_document_name,
+            has_document=bool(u.kyc_document_data),
+            created_at=u.created_at,
+        )
+        for u in users
+    ]
+
+
+@router.get("/kyc/{user_id}/document")
+def get_kyc_document(user_id: str, session: Session = Depends(get_session)):
+    """Return the base64 document for a single user (on-demand only)."""
+    from uuid import UUID as _UUID
+    try:
+        uid = _UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
+    user = session.get(User, uid)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.kyc_document_data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No document uploaded")
+    return {
+        "document_name": user.kyc_document_name,
+        "document_data": user.kyc_document_data,
+    }
+
+
 @router.post("/seats/reset-availability")
 def reset_seat_availability(session: Session = Depends(get_session)):
     session.exec(sqlalchemy.update(Seat).values(is_available=True))

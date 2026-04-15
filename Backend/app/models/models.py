@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Optional, List
 from uuid import UUID, uuid4
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String, Text
 
 
 class UserRole(str, Enum):
@@ -43,6 +43,11 @@ class UserBase(SQLModel):
     role: UserRole = Field(default=UserRole.USER)
     gov_id_type: str
     gov_id_number: str
+    # KYC fields (optional for backward compat with existing users)
+    mobile: Optional[str] = Field(default=None)
+    occupation_sector: Optional[str] = Field(default=None)
+    occupation_role: Optional[str] = Field(default=None)
+    kyc_document_name: Optional[str] = Field(default=None)
 
 
 class User(UserBase, table=True):
@@ -50,6 +55,11 @@ class User(UserBase, table=True):
     hashed_password: str
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Stored as TEXT to hold base64-encoded document (up to ~2 MB)
+    kyc_document_data: Optional[str] = Field(
+        default=None,
+        sa_column=Column("kyc_document_data", Text, nullable=True),
+    )
 
     bookings: List["Booking"] = Relationship(back_populates="user")
 

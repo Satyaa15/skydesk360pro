@@ -42,6 +42,12 @@ def _run_migrations():
         "ALTER TABLE booking ADD COLUMN IF NOT EXISTS price_amount      DOUBLE PRECISION DEFAULT 0",
         "ALTER TABLE booking ADD COLUMN IF NOT EXISTS start_time        TIMESTAMP WITH TIME ZONE",
         "ALTER TABLE booking ADD COLUMN IF NOT EXISTS end_time          TIMESTAMP WITH TIME ZONE",
+        # KYC fields on user table
+        "ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS mobile              VARCHAR",
+        "ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS occupation_sector   VARCHAR",
+        "ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS occupation_role     VARCHAR",
+        "ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS kyc_document_name   VARCHAR",
+        "ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS kyc_document_data   TEXT",
     ]
     try:
         with engine.connect() as conn:

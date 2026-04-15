@@ -164,6 +164,19 @@ export const createPaymentOrderBatch = async (payload) => {
   return res.json();
 };
 
+/* --- Admin KYC --- */
+export const fetchAdminKYC = async () => {
+  const res = await fetch(`${API_BASE_URL}/admin/kyc`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
+export const fetchKYCDocument = async (userId) => {
+  const res = await fetch(`${API_BASE_URL}/admin/kyc/${userId}/document`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
 export const verifyPayment = async (payload) => {
   const res = await fetch(`${API_BASE_URL}/payment/verify`, {
     method: 'POST',

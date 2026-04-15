@@ -1,6 +1,7 @@
 import logging
 from datetime import timedelta
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
@@ -22,6 +23,12 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     gov_id_type: str = Field(min_length=2, max_length=50)
     gov_id_number: str = Field(min_length=4, max_length=64)
+    # KYC fields
+    mobile: str = Field(default='', max_length=20)
+    occupation_sector: str = Field(default='', max_length=100)
+    occupation_role: Optional[str] = Field(default=None, max_length=100)
+    kyc_document_name: Optional[str] = Field(default=None, max_length=255)
+    kyc_document_data: Optional[str] = Field(default=None)  # base64 encoded file
 
 
 class RegisterResponse(BaseModel):
@@ -52,7 +59,12 @@ def register(payload: RegisterRequest, session: Session = Depends(get_session)):
         role=UserRole.USER,
         gov_id_type=payload.gov_id_type,
         gov_id_number=payload.gov_id_number,
-        hashed_password=hashed_pwd
+        hashed_password=hashed_pwd,
+        mobile=payload.mobile or None,
+        occupation_sector=payload.occupation_sector or None,
+        occupation_role=payload.occupation_role or None,
+        kyc_document_name=payload.kyc_document_name or None,
+        kyc_document_data=payload.kyc_document_data or None,
     )
     session.add(db_user)
     session.commit()

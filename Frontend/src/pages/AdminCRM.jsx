@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import * as XLSX from 'xlsx';
 import {
   Users,
   Calendar,
   CreditCard,
   Armchair,
   Search,
-  MoreVertical,
   CheckCircle,
   XCircle,
   Clock,
@@ -19,12 +19,18 @@ import {
   X as CloseIcon,
   Lock,
   Unlock,
+  ShieldCheck,
+  Download,
+  FileText,
+  Eye,
 } from 'lucide-react';
 import {
   fetchAdminStats,
   fetchAdminUsers,
   fetchAdminBookings,
   fetchAdminSeats,
+  fetchAdminKYC,
+  fetchKYCDocument,
   createAdminSeat,
   updateAdminSeat,
   resetSeatAvailability,
@@ -47,6 +53,12 @@ const AdminCRM = () => {
   const [editingSeatId, setEditingSeatId] = useState(null);
   const [editingSeat, setEditingSeat] = useState({ code: '', type: 'workstation', section: '', price: '', is_available: true });
   const [newSeat, setNewSeat] = useState({ code: '', type: 'workstation', section: '', price: '', is_available: true });
+
+  // KYC state
+  const [kycRecords, setKycRecords] = useState([]);
+  const [kycLoading, setKycLoading] = useState(false);
+  const [kycDocModal, setKycDocModal] = useState(null); // { name, data }
+  const [kycDocLoading, setKycDocLoading] = useState(false);
 
   // Confirmation dialog for destructive admin actions
   const [confirmDialog, setConfirmDialog] = useState(null); // { seat, action: 'lock' | 'force-release' }
@@ -72,9 +84,61 @@ const AdminCRM = () => {
     }
   }, []);
 
+  const loadKYC = useCallback(async () => {
+    setKycLoading(true);
+    try {
+      const data = await fetchAdminKYC();
+      setKycRecords(data);
+    } catch {
+      // KYC endpoint failing shouldn't crash the whole panel
+    } finally {
+      setKycLoading(false);
+    }
+  }, []);
+
+  const viewKYCDocument = async (userId) => {
+    setKycDocLoading(true);
+    try {
+      const doc = await fetchKYCDocument(userId);
+      setKycDocModal(doc);
+    } catch (err) {
+      alert(err.message || 'Failed to load document');
+    } finally {
+      setKycDocLoading(false);
+    }
+  };
+
+  const exportKYCToExcel = () => {
+    const rows = kycRecords.map((u) => ({
+      'Full Name': u.full_name,
+      'Email': u.email,
+      'Mobile': u.mobile || '—',
+      'Gov ID Type': u.gov_id_type,
+      'Gov ID Number': u.gov_id_number,
+      'Occupation Sector': u.occupation_sector || '—',
+      'Role / Designation': u.occupation_role || '—',
+      'Document Uploaded': u.has_document ? 'Yes' : 'No',
+      'Document Name': u.kyc_document_name || '—',
+      'Registered On': new Date(u.created_at).toLocaleDateString('en-IN'),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Auto-width columns
+    const colWidths = Object.keys(rows[0] || {}).map((k) => ({
+      wch: Math.max(k.length, ...rows.map((r) => String(r[k] || '').length)) + 2,
+    }));
+    ws['!cols'] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'KYC Records');
+    XLSX.writeFile(wb, `SkyDesk360_KYC_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (activeTab === 'kyc' && kycRecords.length === 0) loadKYC();
+  }, [activeTab, loadKYC, kycRecords.length]);
 
   // Search filter
   const filteredUsers = users.filter(
@@ -276,9 +340,10 @@ const AdminCRM = () => {
           <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '1.25rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
               {[
-                { id: 'users',    label: `Users`,    count: users.length },
-                { id: 'bookings', label: `Bookings`, count: bookings.length },
-                { id: 'seats',    label: `Seats`,    count: seats.length },
+                { id: 'users',    label: 'Users',    count: users.length },
+                { id: 'bookings', label: 'Bookings', count: bookings.length },
+                { id: 'seats',    label: 'Seats',    count: seats.length },
+                { id: 'kyc',      label: 'KYC',      count: kycRecords.length, accent: '#a855f7' },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -287,9 +352,9 @@ const AdminCRM = () => {
                     padding: '0.5rem 1.1rem', borderRadius: '999px', cursor: 'pointer',
                     fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em',
                     transition: 'all 0.2s',
-                    background: activeTab === t.id ? 'rgba(0,242,254,0.08)' : 'transparent',
-                    border: activeTab === t.id ? '1px solid rgba(0,242,254,0.25)' : '1px solid transparent',
-                    color: activeTab === t.id ? '#00f2fe' : '#334155',
+                    background: activeTab === t.id ? `rgba(${t.accent === '#a855f7' ? '168,85,247' : '0,242,254'},0.08)` : 'transparent',
+                    border: activeTab === t.id ? `1px solid rgba(${t.accent === '#a855f7' ? '168,85,247' : '0,242,254'},0.25)` : '1px solid transparent',
+                    color: activeTab === t.id ? (t.accent || '#00f2fe') : '#334155',
                   }}
                 >
                   {t.label}
@@ -672,8 +737,137 @@ const AdminCRM = () => {
               </table>
             </div>
           )}
+        {/* ── KYC Panel ── */}
+        {activeTab === 'kyc' && (
+          <div>
+            {/* KYC toolbar */}
+            <div style={{ padding: '1.25rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', background: 'rgba(168,85,247,0.02)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <ShieldCheck size={16} color="#a855f7" />
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#a855f7' }}>KYC Verification Records</span>
+                <span style={{ fontSize: '0.58rem', fontWeight: 700, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '999px', padding: '0.15rem 0.55rem', color: '#a855f7' }}>
+                  {kycRecords.length} users
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  onClick={loadKYC}
+                  disabled={kycLoading}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.1rem', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#64748b', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: kycLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  {kycLoading ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={11} />}
+                  Refresh
+                </button>
+                <button
+                  onClick={exportKYCToExcel}
+                  disabled={kycRecords.length === 0}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.25rem', borderRadius: '999px', border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: kycRecords.length === 0 ? 'not-allowed' : 'pointer', opacity: kycRecords.length === 0 ? 0.4 : 1 }}
+                >
+                  <Download size={12} /> Export Excel
+                </button>
+              </div>
+            </div>
+
+            {kycLoading ? (
+              <div style={{ padding: '4rem', textAlign: 'center', color: '#334155', fontSize: '0.8rem' }}>
+                <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 1rem', display: 'block', color: '#a855f7' }} />
+                Loading KYC records…
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+                      {['Name', 'Email', 'Mobile', 'Gov ID', 'Sector', 'Role', 'Document', 'Registered'].map((h) => (
+                        <th key={h} style={{ padding: '0.85rem 1.25rem', textAlign: 'left', fontSize: '0.55rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#334155', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {kycRecords.length === 0 ? (
+                      <tr><td colSpan={8} style={{ padding: '4rem', textAlign: 'center', color: '#334155', fontSize: '0.8rem' }}>No KYC records yet.</td></tr>
+                    ) : kycRecords.filter((u) =>
+                        !searchQuery ||
+                        u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (u.mobile || '').includes(searchQuery) ||
+                        (u.occupation_sector || '').toLowerCase().includes(searchQuery.toLowerCase())
+                      ).map((u, i) => (
+                      <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.008)', transition: 'background 0.15s' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(168,85,247,0.04)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.008)'}
+                      >
+                        <td style={{ padding: '0.85rem 1.25rem', fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap' }}>{u.full_name}</td>
+                        <td style={{ padding: '0.85rem 1.25rem', color: '#64748b' }}>{u.email}</td>
+                        <td style={{ padding: '0.85rem 1.25rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>{u.mobile || <span style={{ color: '#334155' }}>—</span>}</td>
+                        <td style={{ padding: '0.85rem 1.25rem', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#00f2fe', background: 'rgba(0,242,254,0.06)', border: '1px solid rgba(0,242,254,0.15)', borderRadius: '6px', padding: '0.2rem 0.5rem', marginRight: '0.4rem' }}>{u.gov_id_type}</span>
+                          <span style={{ color: '#64748b' }}>{u.gov_id_number}</span>
+                        </td>
+                        <td style={{ padding: '0.85rem 1.25rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>{u.occupation_sector || <span style={{ color: '#334155' }}>—</span>}</td>
+                        <td style={{ padding: '0.85rem 1.25rem', color: '#64748b' }}>{u.occupation_role || <span style={{ color: '#334155' }}>—</span>}</td>
+                        <td style={{ padding: '0.85rem 1.25rem' }}>
+                          {u.has_document ? (
+                            <button
+                              onClick={() => viewKYCDocument(u.id)}
+                              disabled={kycDocLoading}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#a855f7', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '6px', padding: '0.3rem 0.65rem', cursor: 'pointer' }}
+                            >
+                              <Eye size={10} /> View
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.6rem', color: '#334155', fontWeight: 700 }}>Not uploaded</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.85rem 1.25rem', color: '#475569', whiteSpace: 'nowrap' }}>{new Date(u.created_at).toLocaleDateString('en-IN')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
         </div>
       </div>
+
+      {/* ── KYC Document Viewer Modal ── */}
+      {kycDocModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(2,2,4,0.92)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+          <div style={{ width: '100%', maxWidth: '600px', background: 'rgba(15,23,42,0.98)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 40px 80px rgba(0,0,0,0.7)' }}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <FileText size={15} color="#a855f7" />
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#a855f7' }}>
+                  {kycDocModal.document_name || 'KYC Document'}
+                </span>
+              </div>
+              <button onClick={() => setKycDocModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><CloseIcon size={18} /></button>
+            </div>
+            <div style={{ maxHeight: '70vh', overflow: 'auto', padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a14' }}>
+              {kycDocModal.document_data?.startsWith('data:image') ? (
+                <img src={kycDocModal.document_data} alt="KYC Document" style={{ maxWidth: '100%', borderRadius: '8px' }} />
+              ) : kycDocModal.document_data?.startsWith('data:application/pdf') ? (
+                <iframe src={kycDocModal.document_data} title="KYC PDF" style={{ width: '100%', height: '60vh', border: 'none', borderRadius: '8px' }} />
+              ) : (
+                <span style={{ color: '#475569', fontSize: '0.8rem' }}>Preview not available. <a href={kycDocModal.document_data} download={kycDocModal.document_name} style={{ color: '#a855f7' }}>Download</a></span>
+              )}
+            </div>
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <a
+                href={kycDocModal.document_data}
+                download={kycDocModal.document_name || 'kyc-document'}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 1.25rem', borderRadius: '999px', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.25)', color: '#a855f7', fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', textDecoration: 'none' }}
+              >
+                <Download size={12} /> Download
+              </a>
+              <button onClick={() => setKycDocModal(null)} style={{ padding: '0.55rem 1.25rem', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#64748b', fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', cursor: 'pointer' }}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Confirmation Dialog ── */}
       {confirmDialog && (
