@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Optional, List
 from uuid import UUID, uuid4
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column, String, Text
+from sqlalchemy import Column, String, Text, DateTime
 
 
 class UserRole(str, Enum):
@@ -78,6 +78,11 @@ class Seat(SeatBase, table=True):
     type: str = Field(
         default=SeatType.WORKSTATION.value,
         sa_column=Column("type", String, nullable=False, default="workstation"),
+    )
+    # Admin-controlled manual lock — seat is locked until this datetime (None = no manual lock)
+    locked_until: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column("locked_until", DateTime(timezone=True), nullable=True),
     )
 
     bookings: List["Booking"] = Relationship(back_populates="seat")

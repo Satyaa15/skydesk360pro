@@ -48,6 +48,8 @@ def _run_migrations():
         "ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS occupation_role     VARCHAR",
         "ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS kyc_document_name   VARCHAR",
         "ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS kyc_document_data   TEXT",
+        # Admin manual seat lock
+        "ALTER TABLE seat ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP WITH TIME ZONE",
     ]
     try:
         with engine.connect() as conn:

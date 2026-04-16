@@ -43,6 +43,9 @@ def create_booking(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seat not available")
 
     now = datetime.now(timezone.utc)
+    if seat.locked_until and seat.locked_until > now:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seat is temporarily locked by admin")
+
     active_booking = session.exec(
         select(Booking).where(
             Booking.seat_id == seat_id,
@@ -68,15 +71,6 @@ def create_booking(
     if stale_pending:
         session.commit()
 
-    seat_already_paid = session.exec(
-        select(Booking).where(
-            Booking.seat_id == seat_id,
-            Booking.status == BookingStatus.PAID,
-        )
-    ).first()
-    if seat_already_paid:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seat has already been paid and booked")
-    
     # Create pending booking
     booking_amount = compute_amount(seat.type, body.duration_unit, body.duration_quantity)
     booking = Booking(

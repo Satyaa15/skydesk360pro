@@ -192,7 +192,8 @@ def create_order_batch(
     locked_seat_ids = set(active_bookings)
 
     for seat in seats:
-        if not seat.is_available or seat.id in locked_seat_ids:
+        manually_locked = seat.locked_until and seat.locked_until > now
+        if not seat.is_available or seat.id in locked_seat_ids or manually_locked:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Seat {seat.code} is not available")
 
     # Cancel any stale PENDING bookings for this user+seats (from abandoned payment attempts)
@@ -208,16 +209,6 @@ def create_order_batch(
         session.add(stale)
     if stale_pending:
         session.commit()
-
-    # Still block if seat is PAID by any user
-    seat_already_paid = session.exec(
-        select(Booking).where(
-            Booking.seat_id.in_(body.seat_ids),
-            Booking.status == BookingStatus.PAID,
-        )
-    ).first()
-    if seat_already_paid:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="One or more seats have already been paid and booked")
 
     booking_ids: list[str] = []
     total_amount = 0.0
@@ -332,6 +323,8 @@ def verify_payment(
                 Booking.seat_id == booking.seat_id,
                 Booking.status == BookingStatus.PAID,
                 Booking.id != booking.id,
+                Booking.end_time.is_not(None),
+                Booking.end_time > now,
             )
         ).first()
         if conflicting:

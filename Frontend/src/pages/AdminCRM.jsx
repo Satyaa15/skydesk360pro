@@ -33,6 +33,7 @@ import {
   fetchKYCDocument,
   createAdminSeat,
   updateAdminSeat,
+  lockAdminSeat,
   resetSeatAvailability,
 } from '../lib/api';
 
@@ -62,6 +63,9 @@ const AdminCRM = () => {
 
   // Confirmation dialog for destructive admin actions
   const [confirmDialog, setConfirmDialog] = useState(null); // { seat, action: 'lock' | 'force-release' }
+  // Timed lock dialog
+  const [lockDialog, setLockDialog] = useState(null); // { seat }
+  const [lockUntilInput, setLockUntilInput] = useState('');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -258,6 +262,36 @@ const AdminCRM = () => {
       loadData();
     } catch (err) {
       setSeatActionError(err.message || 'Failed to force-release seat');
+    }
+  };
+
+  const handleTimedLock = async () => {
+    if (!lockDialog || !lockUntilInput) return;
+    setSeatActionError(null);
+    setSeatActionSuccess(null);
+    try {
+      const isoDate = new Date(lockUntilInput).toISOString();
+      const updated = await lockAdminSeat(lockDialog.seat.id, isoDate);
+      setSeats((prev) => prev.map((s) => (s.id === lockDialog.seat.id ? updated : s)));
+      setSeatActionSuccess(`Seat ${updated.code} manually locked until ${new Date(isoDate).toLocaleString('en-IN')}.`);
+      setLockDialog(null);
+      setLockUntilInput('');
+      loadData();
+    } catch (err) {
+      setSeatActionError(err.message || 'Failed to apply timed lock');
+    }
+  };
+
+  const handleManualUnlock = async (seat) => {
+    setSeatActionError(null);
+    setSeatActionSuccess(null);
+    try {
+      const updated = await lockAdminSeat(seat.id, null);
+      setSeats((prev) => prev.map((s) => (s.id === seat.id ? updated : s)));
+      setSeatActionSuccess(`Manual lock removed from ${updated.code}. Seat is now available.`);
+      loadData();
+    } catch (err) {
+      setSeatActionError(err.message || 'Failed to remove manual lock');
     }
   };
 
@@ -691,29 +725,47 @@ const AdminCRM = () => {
                               </button>
 
                               {seat.is_locked ? (
-                                /* Booking lock (payment in progress) — admin can force-release */
-                                <button
-                                  onClick={() => setConfirmDialog({ seat, action: 'force-release' })}
-                                  className="text-xs uppercase font-black tracking-widest text-orange-400 flex items-center gap-1 hover:text-orange-300 transition-colors"
-                                  title="Force-release this seat even though a booking is in progress"
-                                >
-                                  <Unlock size={12} /> Force Release
-                                </button>
+                                /* Booking-locked (active payment) OR manually locked — show unlock options */
+                                <>
+                                  <button
+                                    onClick={() => handleManualUnlock(seat)}
+                                    className="text-xs uppercase font-black tracking-widest text-emerald-400 flex items-center gap-1 hover:text-emerald-300 transition-colors"
+                                    title="Remove manual timed lock"
+                                  >
+                                    <Unlock size={12} /> Unlock
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmDialog({ seat, action: 'force-release' })}
+                                    className="text-xs uppercase font-black tracking-widest text-orange-400 flex items-center gap-1 hover:text-orange-300 transition-colors"
+                                    title="Force-release — overrides any lock including active bookings"
+                                  >
+                                    Force Release
+                                  </button>
+                                </>
                               ) : seat.is_available ? (
-                                /* Available — admin can lock */
-                                <button
-                                  onClick={() => handleToggleAvailability(seat)}
-                                  className="text-xs uppercase font-black tracking-widest text-red-400 flex items-center gap-1 hover:text-red-300 transition-colors"
-                                  title="Lock seat — users will not be able to book it"
-                                >
-                                  <Lock size={12} /> Lock
-                                </button>
+                                /* Available — admin can permanently lock or set a timed lock */
+                                <>
+                                  <button
+                                    onClick={() => { setLockDialog({ seat }); setLockUntilInput(''); }}
+                                    className="text-xs uppercase font-black tracking-widest text-yellow-400 flex items-center gap-1 hover:text-yellow-300 transition-colors"
+                                    title="Set a timed lock — seat auto-unlocks after the chosen time"
+                                  >
+                                    <Clock size={12} /> Timed Lock
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleAvailability(seat)}
+                                    className="text-xs uppercase font-black tracking-widest text-red-400 flex items-center gap-1 hover:text-red-300 transition-colors"
+                                    title="Permanent lock — seat hidden from booking until manually unlocked"
+                                  >
+                                    <Lock size={12} /> Perm Lock
+                                  </button>
+                                </>
                               ) : (
-                                /* Admin-locked or customer-booked — admin can unlock/release */
+                                /* Permanently admin-locked — unlock */
                                 <button
                                   onClick={() => setConfirmDialog({ seat, action: 'force-release' })}
                                   className="text-xs uppercase font-black tracking-widest text-emerald-400 flex items-center gap-1 hover:text-emerald-300 transition-colors"
-                                  title="Unlock this seat — overrides any existing booking or admin lock"
+                                  title="Unlock this seat"
                                 >
                                   <Unlock size={12} /> Unlock
                                 </button>
@@ -830,6 +882,49 @@ const AdminCRM = () => {
         )}
         </div>
       </div>
+
+      {/* ── Timed Lock Dialog ── */}
+      {lockDialog && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(2,2,4,0.85)', backdropFilter: 'blur(18px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+          <div style={{ width: '100%', maxWidth: '400px', background: 'rgba(15,23,42,0.97)', border: '1px solid rgba(234,179,8,0.25)', borderRadius: '22px', padding: '2rem', boxShadow: '0 40px 80px rgba(0,0,0,0.7)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #eab308, #f97316)' }} />
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', marginBottom: '1.2rem', background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Clock size={20} color="#eab308" />
+            </div>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.01em', color: '#fff', marginBottom: '0.4rem' }}>
+              Timed Lock — <span style={{ color: '#eab308' }}>{lockDialog.seat.code}</span>
+            </h3>
+            <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '1.25rem', lineHeight: 1.6 }}>
+              Seat will be locked until the chosen time, then automatically unlocked for new bookings.
+            </p>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#64748b', marginBottom: '0.5rem' }}>Lock Until</label>
+              <input
+                type="datetime-local"
+                value={lockUntilInput}
+                onChange={(e) => setLockUntilInput(e.target.value)}
+                min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(234,179,8,0.25)', borderRadius: '10px', padding: '0.7rem 1rem', color: '#e2e8f0', fontSize: '0.8rem', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => { setLockDialog(null); setLockUntilInput(''); }}
+                style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleTimedLock}
+                disabled={!lockUntilInput}
+                style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', background: lockUntilInput ? 'linear-gradient(135deg, #eab308, #f97316)' : 'rgba(255,255,255,0.05)', border: 'none', color: lockUntilInput ? '#000' : '#334155', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: lockUntilInput ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+              >
+                <Lock size={12} /> Apply Lock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── KYC Document Viewer Modal ── */}
       {kycDocModal && (

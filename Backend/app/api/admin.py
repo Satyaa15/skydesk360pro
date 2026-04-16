@@ -67,6 +67,12 @@ class AdminSeatUpdate(BaseModel):
     section: Optional[str] = None
     price: Optional[float] = None
     is_available: Optional[bool] = None
+    locked_until: Optional[datetime] = None
+
+
+class AdminSeatLock(BaseModel):
+    """Lock a seat manually until a specific datetime. Pass null to unlock."""
+    locked_until: Optional[datetime] = None
 
 
 @router.get("/users", response_model=List[AdminUserSummary])
@@ -143,7 +149,7 @@ def get_seats(session: Session = Depends(get_session)):
             Booking.end_time > now,
         )
     ).all()
-    locked_map = {seat_id: end_time for seat_id, end_time in active_bookings}
+    booking_lock_map = {seat_id: end_time for seat_id, end_time in active_bookings}
     return [
         AdminSeatSummary(
             id=seat.id,
@@ -151,9 +157,9 @@ def get_seats(session: Session = Depends(get_session)):
             type=seat.type,
             section=seat.section,
             price=seat.price,
-            is_available=seat.is_available and seat.id not in locked_map,
-            is_locked=seat.id in locked_map,
-            locked_until=locked_map.get(seat.id),
+            is_available=seat.is_available and seat.id not in booking_lock_map and not (seat.locked_until and seat.locked_until > now),
+            is_locked=seat.id in booking_lock_map or bool(seat.locked_until and seat.locked_until > now),
+            locked_until=booking_lock_map.get(seat.id) or (seat.locked_until if seat.locked_until and seat.locked_until > now else None),
         )
         for seat in seats
     ]
@@ -216,19 +222,47 @@ def update_seat(seat_id: int, body: AdminSeatUpdate, session: Session = Depends(
         seat.price = body.price
     if body.is_available is not None:
         seat.is_available = body.is_available
+    # Allow explicit null to clear the lock (use model_fields_set to distinguish "not sent" from "sent as null")
+    if 'locked_until' in body.model_fields_set:
+        seat.locked_until = body.locked_until
 
     session.add(seat)
     session.commit()
     session.refresh(seat)
+    now = datetime.now(timezone.utc)
     return AdminSeatSummary(
         id=seat.id,
         code=seat.code,
         type=seat.type,
         section=seat.section,
         price=seat.price,
-        is_available=seat.is_available,
-        is_locked=False,
-        locked_until=None,
+        is_available=seat.is_available and not (seat.locked_until and seat.locked_until > now),
+        is_locked=bool(seat.locked_until and seat.locked_until > now),
+        locked_until=seat.locked_until if seat.locked_until and seat.locked_until > now else None,
+    )
+
+
+@router.patch("/seats/{seat_id}/lock", response_model=AdminSeatSummary)
+def lock_seat(seat_id: int, body: AdminSeatLock, session: Session = Depends(get_session)):
+    """Manually lock or unlock a seat. Pass locked_until=null to remove the manual lock."""
+    seat = session.get(Seat, seat_id)
+    if not seat:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seat not found")
+
+    seat.locked_until = body.locked_until
+    session.add(seat)
+    session.commit()
+    session.refresh(seat)
+    now = datetime.now(timezone.utc)
+    return AdminSeatSummary(
+        id=seat.id,
+        code=seat.code,
+        type=seat.type,
+        section=seat.section,
+        price=seat.price,
+        is_available=seat.is_available and not (seat.locked_until and seat.locked_until > now),
+        is_locked=bool(seat.locked_until and seat.locked_until > now),
+        locked_until=seat.locked_until if seat.locked_until and seat.locked_until > now else None,
     )
 
 

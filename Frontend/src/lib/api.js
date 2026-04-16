@@ -165,6 +165,16 @@ export const createPaymentOrderBatch = async (payload) => {
 };
 
 /* --- Admin KYC --- */
+export const lockAdminSeat = async (seatId, lockedUntil) => {
+  const res = await fetch(`${API_BASE_URL}/admin/seats/${seatId}/lock`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ locked_until: lockedUntil }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
 export const fetchAdminKYC = async () => {
   const res = await fetch(`${API_BASE_URL}/admin/kyc`, { headers: authHeaders() });
   if (!res.ok) throw new Error(await parseError(res));
