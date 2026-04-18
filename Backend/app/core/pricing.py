@@ -10,8 +10,8 @@ from app.models.models import BookingDuration
 SEAT_PRICES: dict[str, dict[str, float]] = {
     "workstation": {"hourly": 100.0,  "daily": 400.0,   "monthly": 7_000.0},
     "cabin":       {"hourly": 400.0,  "daily": 2_500.0,  "monthly": 35_000.0},
-    "conference":  {"hourly": 550.0,  "daily": 4_500.0,  "monthly": 60_000.0},
-    "meeting_room":{"hourly": 550.0,  "daily": 4_500.0,  "monthly": 60_000.0},
+    "conference":  {"hourly": 550.0,  "daily": 4_500.0,  "monthly": 90_000.0},
+    "meeting_room":{"hourly": 550.0,  "daily": 4_500.0,  "monthly": 90_000.0},
 }
 _DEFAULT_TYPE = "workstation"
 _YEARLY_DISCOUNT = Decimal("0.90")

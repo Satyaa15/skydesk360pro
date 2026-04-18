@@ -18,8 +18,8 @@ const TYPE_LABELS = {
 const SEAT_PRICES = {
   workstation:  { hourly: 100,  daily: 400,   monthly: 7000  },
   cabin:        { hourly: 400,  daily: 2500,  monthly: 35000 },
-  conference:   { hourly: 550,  daily: 4500,  monthly: 60000 },
-  meeting_room: { hourly: 550,  daily: 4500,  monthly: 60000 },
+  conference:   { hourly: 550,  daily: 4500,  monthly: 90000 },
+  meeting_room: { hourly: 550,  daily: 4500,  monthly: 90000 },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────

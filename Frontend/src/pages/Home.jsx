@@ -589,7 +589,7 @@ const Home = () => {
               />
               <PriceCard
                 title="Conference Room"
-                prices={{ hourly: '550', daily: '4,500', monthly: '60,000' }}
+                prices={{ hourly: '550', daily: '4,500', monthly: '90,000' }}
                 features={['Up to 10 People', '4K Smart Screen', 'Fiber Internet', 'Whiteboard & AV']}
                 accent="#f97316"
               />
