@@ -370,9 +370,20 @@ def verify_payment(
                 current_user.full_name,
                 {
                     "seat_code": seat.code,
-                    "date": booking.booking_date.strftime("%Y-%m-%d"),
+                    "seat_type": seat.type,
+                    "section": seat.section,
+                    "duration_unit": booking.duration_unit.value,
+                    "duration_quantity": booking.duration_quantity,
                     "amount": amount,
                     "transaction_id": body.razorpay_payment_id,
+                    "start_time": booking.start_time,
+                    "end_time": booking.end_time,
+                    "booking_date": booking.booking_date,
+                    # Admin notification extras
+                    "user_name": current_user.full_name,
+                    "user_email": current_user.email,
+                    "user_mobile": getattr(current_user, "mobile", None),
+                    "gov_id": f"{current_user.gov_id_type}: {current_user.gov_id_number}",
                 },
             )
     except Exception as exc:
