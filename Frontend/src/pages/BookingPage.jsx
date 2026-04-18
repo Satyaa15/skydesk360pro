@@ -8,9 +8,20 @@ import { fetchSeats } from '../lib/api';
 /* ─── Constants ─── */
 const WORKSPACE_LABELS = {
   workstation: 'Workstation',
-  cabin: 'Cabin',
+  cabin: 'Private Cabin',
   meeting_room: 'Meeting Room',
   conference: 'Conference',
+};
+
+// Cabins must be booked as a whole unit.
+// Key = zone name, value = the one representative seat ID sent to the backend.
+const CABIN_PRIMARY_SEAT = {
+  "CEO's Cabin":      'CEO-1',
+  "Director's Cabin": 'DIR-1',
+};
+const CABIN_ZONE_LABEL = {
+  "CEO's Cabin":      "CEO's Cabin (3-seat unit)",
+  "Director's Cabin": "Director's Cabin (5-seat unit)",
 };
 
 const WORKSPACE_FILTERS = [
@@ -318,10 +329,17 @@ const FloorPlanSVG = React.memo(({ visibleSeats, isSeatSelected, toggleSeat, hov
           {/* Hover tooltip — available */}
           {isHovered && !seat.booked && !seat.locked && (
             <g className="seat-tooltip-group">
-              <rect x={cx - 55} y={cy - 32} width="110" height="34" rx="6"
+              <rect x={cx - 65} y={cy - 38} width="130" height="42" rx="6"
                 fill="rgba(15,23,42,0.95)" stroke="rgba(0,242,254,0.3)" strokeWidth="0.8" />
-              <text x={cx} y={cy - 19} className="tooltip-title">{seat.id} — {seat.zone}</text>
-              <text x={cx} y={cy - 7} className="tooltip-price">₹{formatPrice(seat.displayPrice ?? seat.price)}/{durationUnit}</text>
+              <text x={cx} y={cy - 25} className="tooltip-title">
+                {seat.workspaceType === 'cabin' ? seat.zone : `${seat.id} — ${seat.zone}`}
+              </text>
+              {seat.workspaceType === 'cabin' && (
+                <text x={cx} y={cy - 14} className="tooltip-title" style={{ fontSize: '5.5px', fill: '#a855f7' }}>
+                  Whole cabin — click to book entire unit
+                </text>
+              )}
+              <text x={cx} y={cy - 4} className="tooltip-price">₹{formatPrice(seat.displayPrice ?? seat.price)}/{durationUnit}</text>
             </g>
           )}
           {/* Hover tooltip — admin locked or booked */}
@@ -401,8 +419,9 @@ const BookingPage = () => {
     return map;
   }, [backendSeats]);
 
-  const enrichedSeats = useMemo(() => (
-    FLOOR_PLAN_SEATS.map((seat) => {
+  const enrichedSeats = useMemo(() => {
+    // First pass: enrich individual seats
+    const base = FLOOR_PLAN_SEATS.map((seat) => {
       const backendSeat = backendSeatMap.get(seat.id);
       if (!backendSeat) {
         return { ...seat, booked: true, locked: false, lockedUntil: null, dbId: null, backendAvailable: false };
@@ -420,8 +439,23 @@ const BookingPage = () => {
         lockedUntil: backendSeat.locked_until ? new Date(backendSeat.locked_until) : null,
         backendAvailable: backendSeat.is_available,
       };
-    })
-  ), [backendSeatMap]);
+    });
+
+    // Second pass: for cabin zones, if the PRIMARY seat is unavailable/locked
+    // mark ALL seats in that zone the same way (cabin = whole-unit booking).
+    const cabinZoneStatus = {};
+    Object.entries(CABIN_PRIMARY_SEAT).forEach(([zone, primaryId]) => {
+      const primary = base.find((s) => s.id === primaryId);
+      if (primary) cabinZoneStatus[zone] = { booked: primary.booked, locked: primary.locked, lockedUntil: primary.lockedUntil };
+    });
+
+    return base.map((seat) => {
+      if (seat.workspaceType !== 'cabin') return seat;
+      const status = cabinZoneStatus[seat.zone];
+      if (!status) return seat;
+      return { ...seat, booked: status.booked, locked: status.locked, lockedUntil: status.lockedUntil };
+    });
+  }, [backendSeatMap]);
 
   const visibleSeats = useMemo(() => {
     const filtered = activeFilter === 'all'
@@ -439,19 +473,42 @@ const BookingPage = () => {
     return { seatTotal, availableSeats };
   }, [enrichedSeats]);
 
+  // For cabins: clicking any seat in a zone selects/deselects the PRIMARY seat only.
+  // This sends one seat_id to the backend → charges cabin price once.
   const toggleSeat = useCallback((seat) => {
-    setSelectedSeats((prev) => {
-      const exists = prev.find((s) => s.id === seat.id);
-      return exists ? prev.filter((s) => s.id !== seat.id) : [...prev, seat];
-    });
-  }, []);
+    if (seat.workspaceType === 'cabin') {
+      const primaryId = CABIN_PRIMARY_SEAT[seat.zone];
+      const primarySeat = enrichedSeats.find((s) => s.id === primaryId);
+      if (!primarySeat || !primarySeat.dbId) return;
+      setSelectedSeats((prev) => {
+        const exists = prev.find((s) => s.id === primaryId);
+        return exists ? prev.filter((s) => s.id !== primaryId) : [...prev, { ...primarySeat, _cabinZone: seat.zone }];
+      });
+    } else {
+      setSelectedSeats((prev) => {
+        const exists = prev.find((s) => s.id === seat.id);
+        return exists ? prev.filter((s) => s.id !== seat.id) : [...prev, seat];
+      });
+    }
+  }, [enrichedSeats]);
+
+  // A cabin seat looks "selected" if its zone's primary seat is selected.
+  const isSeatSelected = useCallback((seatId) => {
+    const seat = enrichedSeats.find((s) => s.id === seatId);
+    if (seat?.workspaceType === 'cabin') {
+      const primaryId = CABIN_PRIMARY_SEAT[seat.zone];
+      return selectedSeats.some((s) => s.id === primaryId);
+    }
+    return selectedSeats.some((s) => s.id === seatId);
+  }, [selectedSeats, enrichedSeats]);
 
   const removeSeat = (seatId) => setSelectedSeats((prev) => prev.filter((s) => s.id !== seatId));
-  const isSeatSelected = useCallback((seatId) => selectedSeats.some((s) => s.id === seatId), [selectedSeats]);
-  const totalPrice = useMemo(
-    () => selectedSeats.reduce((sum, s) => sum + computeDurationPrice(s.workspaceType, durationUnit, durationQuantity), 0),
-    [selectedSeats, durationUnit, durationQuantity]
-  );
+
+  // Cabins charge once per zone (not per individual seat).
+  const totalPrice = useMemo(() => {
+    return selectedSeats.reduce((sum, s) => sum + computeDurationPrice(s.workspaceType, durationUnit, durationQuantity), 0);
+  }, [selectedSeats, durationUnit, durationQuantity]);
+
   const selectionBreakdown = useMemo(() =>
     selectedSeats.reduce((acc, s) => { acc[s.workspaceType] = (acc[s.workspaceType] || 0) + 1; return acc; }, {}),
     [selectedSeats]
@@ -645,7 +702,7 @@ const BookingPage = () => {
           </div>
 
           <div className="bp-duration-summary">
-            Selected {selectedSeats.length} of {workspaceStats.availableSeats} remaining
+            Selected {selectedSeats.length} unit{selectedSeats.length !== 1 ? 's' : ''} of {workspaceStats.availableSeats} remaining
           </div>
 
           {selectedSeats.length === 0 ? (
@@ -659,25 +716,32 @@ const BookingPage = () => {
               <>
                 <div className="bp-seats-list">
                   <AnimatePresence>
-                    {selectedSeats.map((seat) => (
-                      <motion.div
-                        key={seat.id}
-                        initial={{ opacity: 0, x: -16 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 16 }}
-                        className="bp-seat-row"
-                      >
-                        <div className="bp-seat-info">
-                          <span className="bp-seat-name">{seat.id}</span>
-                          <span className="bp-seat-zone">{seat.zone}</span>
-                          <span className="bp-seat-type">{WORKSPACE_LABELS[seat.workspaceType]}</span>
-                        </div>
-                        <div className="bp-seat-actions">
-                          <span className="bp-seat-price">₹{formatPrice(computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity))}</span>
-                          <button className="bp-remove-btn" onClick={() => removeSeat(seat.id)} title="Remove"><X size={13} /></button>
-                        </div>
-                      </motion.div>
-                    ))}
+                    {selectedSeats.map((seat) => {
+                      const isCabin = seat.workspaceType === 'cabin';
+                      const displayName = isCabin
+                        ? (CABIN_ZONE_LABEL[seat._cabinZone || seat.zone] || seat.zone)
+                        : seat.id;
+                      const displayZone = isCabin ? 'Whole cabin — book as one unit' : seat.zone;
+                      return (
+                        <motion.div
+                          key={seat.id}
+                          initial={{ opacity: 0, x: -16 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 16 }}
+                          className="bp-seat-row"
+                        >
+                          <div className="bp-seat-info">
+                            <span className="bp-seat-name">{displayName}</span>
+                            <span className="bp-seat-zone">{displayZone}</span>
+                            <span className="bp-seat-type">{WORKSPACE_LABELS[seat.workspaceType]}</span>
+                          </div>
+                          <div className="bp-seat-actions">
+                            <span className="bp-seat-price">₹{formatPrice(computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity))}</span>
+                            <button className="bp-remove-btn" onClick={() => removeSeat(seat.id)} title="Remove"><X size={13} /></button>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
                   </AnimatePresence>
                 </div>
 
