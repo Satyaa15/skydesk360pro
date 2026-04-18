@@ -54,13 +54,10 @@ class Settings:
     SQL_ECHO: bool = _get_bool_env("SQL_ECHO", default=False)
     CORS_ORIGINS: list[str] = _get_cors_origins()
 
-    # Mail settings
-    MAIL_USERNAME: str | None = os.getenv("MAIL_USERNAME")
-    MAIL_PASSWORD: str | None = os.getenv("MAIL_PASSWORD")
-    MAIL_FROM: str | None = os.getenv("MAIL_FROM")
-    MAIL_PORT: int = int(os.getenv("MAIL_PORT", 587))
-    MAIL_SERVER: str | None = os.getenv("MAIL_SERVER")
-    MAIL_FROM_NAME: str | None = os.getenv("MAIL_FROM_NAME")
+    # Email — Resend (https://resend.com)
+    RESEND_API_KEY: str | None = os.getenv("RESEND_API_KEY")
+    MAIL_FROM: str = os.getenv("MAIL_FROM", "info@skydesk360.com")
+    MAIL_FROM_NAME: str = os.getenv("MAIL_FROM_NAME", "SkyDesk360")
 
     # Admin root
     ADMIN_EMAIL: str | None = os.getenv("ADMIN_EMAIL")
