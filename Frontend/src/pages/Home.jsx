@@ -576,20 +576,20 @@ const Home = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
               <PriceCard
                 title="Dedicated Desk"
-                prices={{ hourly: '100', daily: '400', monthly: '7,000' }}
+                prices={{ hourly: '100', daily: '500', monthly: '7,500' }}
                 features={['Ergonomic Workstation', 'High-Speed WiFi', 'Coffee & Pantry', 'Shared Lounge']}
                 accent="#00f2fe"
               />
               <PriceCard
                 title="Private Cabin"
-                prices={{ hourly: '400', daily: '2,500', monthly: '35,000' }}
+                prices={{ hourly: '500', daily: '2,500', monthly: '40,000' }}
                 features={['Private Enclosed Space', 'Concierge Service', 'Priority Meeting Room', 'Valet Parking']}
                 highlight
                 accent="#a855f7"
               />
               <PriceCard
                 title="Conference Room"
-                prices={{ hourly: '550', daily: '4,500', monthly: '90,000' }}
+                prices={{ hourly: '700', daily: '4,500', monthly: '90,000' }}
                 features={['Up to 10 People', '4K Smart Screen', 'Fiber Internet', 'Whiteboard & AV']}
                 accent="#f97316"
               />

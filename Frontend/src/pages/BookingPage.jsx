@@ -30,10 +30,10 @@ const DURATION_OPTIONS = [
 
 // Matches backend pricing.SEAT_PRICES — must stay in sync with pricing.py
 const SEAT_PRICES = {
-  workstation:  { hourly: 100,  daily: 400,   monthly: 7000  },
-  cabin:        { hourly: 400,  daily: 2500,  monthly: 35000 },
-  conference:   { hourly: 550,  daily: 4500,  monthly: 90000 },
-  meeting_room: { hourly: 550,  daily: 4500,  monthly: 90000 },
+  workstation:  { hourly: 100,  daily: 500,   monthly: 7500  },
+  cabin:        { hourly: 500,  daily: 2500,  monthly: 40000 },
+  conference:   { hourly: 700,  daily: 4500,  monthly: 90000 },
+  meeting_room: { hourly: 700,  daily: 4500,  monthly: 90000 },
 };
 
 const computeDurationPrice = (workspaceType, durationUnit, quantity = 1) => {
