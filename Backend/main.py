@@ -1,12 +1,18 @@
-0+ 2Afrom fastapi import FastAPI
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import init_db
 from app.api import auth, seats, bookings, admin, payment
 from app.core.config import settings
 
-app = FastAPI(title=settings.PROJECT_NAME)
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    init_db()
+    yield
 
-# 🔥 Bulletproof CORS — always include production domains
+app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+
+# Bulletproof CORS — always include production domains
 REQUIRED_ORIGINS = [
     "https://skydesk360.com",
     "https://www.skydesk360.com",
@@ -22,11 +28,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Startup event
-@app.on_event("startup")
-def on_startup():
-    init_db()
 
 # Include Routers
 app.include_router(auth.router)
