@@ -12,8 +12,8 @@ const SignIn      = lazy(() => import('./pages/SignIn'));
 const Register    = lazy(() => import('./pages/Register'));
 const AdminCRM    = lazy(() => import('./pages/AdminCRM'));
 
-// Auto-logout after this many milliseconds of no user activity (60 seconds)
-const INACTIVITY_TIMEOUT_MS = 60 * 1000;
+// Auto-logout after 30 minutes of no user activity
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 
 // Events that count as "activity"
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];

@@ -2,11 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, func
 from pydantic import BaseModel
 from app.db.database import get_session
-from app.models.models import Booking, User, Seat, SeatType, BookingStatus
-from app.core.auth import admin_required
+from app.models.models import Booking, User, Seat, SeatType, BookingStatus, BookingDuration, Payment, PaymentStatus, RazorpayPaymentStatus
+from app.core.auth import admin_required, get_current_user
+from app.core.pricing import compute_amount, to_paise, compute_end_time
 from typing import List, Optional
 from datetime import datetime, timezone
 import sqlalchemy
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(admin_required)])
 
@@ -326,3 +330,136 @@ def reset_seat_availability(session: Session = Depends(get_session)):
     session.exec(sqlalchemy.update(Seat).values(is_available=True))
     session.commit()
     return {"message": "All seats marked available."}
+
+
+# ── Admin Manual Booking ────────────────────────────────────────────────────
+
+class AdminBookingOrderRequest(BaseModel):
+    seat_ids: List[int]
+    duration_unit: BookingDuration = BookingDuration.MONTHLY
+    duration_quantity: int = 1
+    custom_amount: Optional[float] = None   # override computed price (total, in INR)
+
+
+class AdminBookingOrderResponse(BaseModel):
+    razorpay_order_id: str
+    amount: int          # paise
+    currency: str
+    key_id: str
+    booking_ids: List[str]
+    computed_amount: float   # INR total shown to admin
+
+
+@router.post("/bookings/create-order", response_model=AdminBookingOrderResponse)
+def admin_create_booking_order(
+    body: AdminBookingOrderRequest,
+    current_admin: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Admin creates a booking + Razorpay order, optionally with a custom amount."""
+    import razorpay
+    from app.core.config import settings
+
+    if body.duration_quantity < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Duration quantity must be at least 1")
+    if not body.seat_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one seat required")
+
+    seats = session.exec(select(Seat).where(Seat.id.in_(body.seat_ids))).all()
+    seat_map = {seat.id: seat for seat in seats}
+    missing = [sid for sid in body.seat_ids if sid not in seat_map]
+    if missing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Some seats not found")
+
+    now = datetime.now(timezone.utc)
+    active = session.exec(
+        select(Booking.seat_id).where(
+            Booking.status == BookingStatus.PAID,
+            Booking.end_time.is_not(None),
+            Booking.end_time > now,
+        )
+    ).all()
+    locked_ids = set(active)
+
+    for seat in seats:
+        manually_locked = seat.locked_until and seat.locked_until > now
+        if not seat.is_available or seat.id in locked_ids or manually_locked:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Seat {seat.code} is not available")
+
+    # Cancel stale PENDING bookings by this admin for these seats
+    stale = session.exec(
+        select(Booking).where(
+            Booking.user_id == current_admin.id,
+            Booking.seat_id.in_(body.seat_ids),
+            Booking.status == BookingStatus.PENDING,
+        )
+    ).all()
+    for b in stale:
+        b.status = BookingStatus.CANCELLED
+        session.add(b)
+    if stale:
+        session.commit()
+
+    # Compute per-seat amounts
+    computed_total = sum(
+        compute_amount(seat_map[sid].type, body.duration_unit, body.duration_quantity)
+        for sid in body.seat_ids
+    )
+    total_amount = body.custom_amount if body.custom_amount and body.custom_amount > 0 else computed_total
+    # Distribute custom amount proportionally across seats
+    per_seat_amount = round(total_amount / len(body.seat_ids), 2)
+
+    booking_ids: List[str] = []
+    for seat_id in body.seat_ids:
+        booking = Booking(
+            user_id=current_admin.id,
+            seat_id=seat_id,
+            booking_date=now,
+            status=BookingStatus.PENDING,
+            duration_unit=body.duration_unit,
+            duration_quantity=body.duration_quantity,
+            price_amount=per_seat_amount,
+        )
+        session.add(booking)
+        session.flush()
+        booking_ids.append(str(booking.id))
+    session.commit()
+
+    if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Payment gateway not configured")
+
+    client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+    amount_paise = to_paise(total_amount)
+    receipt = f"adm-{booking_ids[0][:8]}"
+
+    try:
+        order = client.order.create({
+            "amount": amount_paise,
+            "currency": "INR",
+            "receipt": receipt,
+            "notes": {
+                "booking_ids": ",".join(b[:8] for b in booking_ids),
+                "admin_email": current_admin.email,
+                "type": "admin_manual",
+            },
+        })
+    except Exception as exc:
+        logger.error("Admin Razorpay order creation failed: %s", exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Payment gateway error.")
+
+    for bid in booking_ids:
+        booking = session.get(Booking, bid)
+        if booking:
+            booking.razorpay_order_id = order["id"]
+            booking.payment_status = RazorpayPaymentStatus.PENDING
+            session.add(booking)
+    session.commit()
+
+    return AdminBookingOrderResponse(
+        razorpay_order_id=order["id"],
+        amount=amount_paise,
+        currency="INR",
+        key_id=settings.RAZORPAY_KEY_ID,
+        booking_ids=booking_ids,
+        computed_amount=total_amount,
+    )

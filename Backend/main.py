@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+0+ 2Afrom fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import init_db
 from app.api import auth, seats, bookings, admin, payment

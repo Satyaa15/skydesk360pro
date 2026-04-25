@@ -23,6 +23,9 @@ import {
   Download,
   FileText,
   Eye,
+  ShoppingCart,
+  IndianRupee,
+  Zap,
 } from 'lucide-react';
 import {
   fetchAdminStats,
@@ -35,7 +38,30 @@ import {
   updateAdminSeat,
   lockAdminSeat,
   resetSeatAvailability,
+  createAdminBookingOrder,
+  verifyPayment,
 } from '../lib/api';
+
+const ADMIN_SEAT_PRICES = {
+  workstation:  { hourly: 100,  daily: 500,   monthly: 7500  },
+  cabin:        { hourly: 500,  daily: 2500,  monthly: 40000 },
+  conference:   { hourly: 700,  daily: 4500,  monthly: 90000 },
+  meeting_room: { hourly: 700,  daily: 4500,  monthly: 90000 },
+};
+const computeSeatPrice = (type, unit, qty = 1) => {
+  const prices = ADMIN_SEAT_PRICES[type] || ADMIN_SEAT_PRICES.workstation;
+  const rate = unit === 'hourly' ? prices.hourly : unit === 'daily' ? prices.daily : prices.monthly;
+  return rate * qty;
+};
+
+const loadRazorpayScript = () => new Promise((resolve) => {
+  if (window.Razorpay) { resolve(true); return; }
+  const script = document.createElement('script');
+  script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+  script.onload = () => resolve(true);
+  script.onerror = () => resolve(false);
+  document.body.appendChild(script);
+});
 
 const AdminCRM = () => {
   const [activeTab, setActiveTab] = useState('users');
@@ -66,6 +92,16 @@ const AdminCRM = () => {
   // Timed lock dialog
   const [lockDialog, setLockDialog] = useState(null); // { seat }
   const [lockUntilInput, setLockUntilInput] = useState('');
+
+  // Admin manual booking state
+  const [adminSelectedIds, setAdminSelectedIds] = useState([]);
+  const [adminDurationUnit, setAdminDurationUnit] = useState('monthly');
+  const [adminDurationQty, setAdminDurationQty] = useState(1);
+  const [adminUseCustom, setAdminUseCustom] = useState(false);
+  const [adminCustomAmount, setAdminCustomAmount] = useState('');
+  const [adminBookingLoading, setAdminBookingLoading] = useState(false);
+  const [adminBookingError, setAdminBookingError] = useState(null);
+  const [adminBookingSuccess, setAdminBookingSuccess] = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -307,10 +343,85 @@ const AdminCRM = () => {
     }
   };
 
+  const handleAdminPayment = async () => {
+    if (adminBookingLoading || adminSelectedIds.length === 0) return;
+    setAdminBookingLoading(true);
+    setAdminBookingError(null);
+    try {
+      const payload = {
+        seat_ids: adminSelectedIds,
+        duration_unit: adminDurationUnit,
+        duration_quantity: adminDurationQty,
+        custom_amount: adminUseCustom && adminCustomAmount ? Number(adminCustomAmount) : null,
+      };
+      const order = await createAdminBookingOrder(payload);
+      const loaded = await loadRazorpayScript();
+      if (!loaded) throw new Error('Failed to load Razorpay checkout.');
+
+      const adminUser = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}'); } catch { return {}; } })();
+      const options = {
+        key: order.key_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'SkyDesk Pro',
+        description: `Admin booking: ${adminSelectedIds.length} seat(s) — ${adminDurationQty}× ${adminDurationUnit}`,
+        order_id: order.razorpay_order_id,
+        prefill: { name: adminUser?.full_name || '', email: adminUser?.email || '' },
+        theme: { color: '#00f2fe' },
+        config: {
+          display: {
+            blocks: {
+              qr: { name: 'Scan & Pay (QR)', instruments: [{ method: 'upi', flows: ['qr'] }] },
+            },
+            sequence: ['block.qr'],
+            preferences: { show_default_blocks: true },
+          },
+        },
+        handler: async (response) => {
+          try {
+            await verifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            setAdminBookingSuccess({ bookingIds: order.booking_ids, amount: order.computed_amount });
+            setAdminSelectedIds([]);
+            setAdminCustomAmount('');
+            setAdminUseCustom(false);
+            loadData();
+          } catch (err) {
+            setAdminBookingError(err?.message || 'Payment verification failed.');
+          } finally {
+            setAdminBookingLoading(false);
+          }
+        },
+        modal: { ondismiss: () => setAdminBookingLoading(false) },
+      };
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (resp) => {
+        setAdminBookingError(resp?.error?.description || 'Payment failed.');
+        setAdminBookingLoading(false);
+      });
+      rzp.open();
+    } catch (err) {
+      setAdminBookingError(err?.message || 'Failed to initiate booking.');
+      setAdminBookingLoading(false);
+    }
+  };
+
+  const adminAvailableSeats = seats.filter((s) => s.is_available && !s.is_locked);
+  const adminSelectedSeats = adminAvailableSeats.filter((s) => adminSelectedIds.includes(s.id));
+  const adminComputedTotal = adminSelectedSeats.reduce(
+    (sum, s) => sum + computeSeatPrice(s.type, adminDurationUnit, adminDurationQty), 0
+  );
+  const adminFinalAmount = adminUseCustom && adminCustomAmount && Number(adminCustomAmount) > 0
+    ? Number(adminCustomAmount)
+    : adminComputedTotal;
+
   const emptyColSpan = activeTab === 'bookings' ? 8 : activeTab === 'seats' ? 6 : 5;
 
   return (
-    <div className="min-h-screen text-white pt-24 px-6 md:px-12 pb-20" style={{ background: '#020204', fontFamily: "'Inter', sans-serif" }}>
+    <div className="min-h-screen text-white pt-20 sm:pt-24 px-3 sm:px-6 md:px-12 pb-20" style={{ background: '#020204', fontFamily: "'Inter', sans-serif" }}>
       {/* Ambient background */}
       <div style={{ position: 'fixed', inset: 0, backgroundImage: 'linear-gradient(rgba(0,242,254,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(0,242,254,0.015) 1px, transparent 1px)', backgroundSize: '60px 60px', pointerEvents: 'none', zIndex: 0 }} />
 
@@ -371,13 +482,14 @@ const AdminCRM = () => {
         {/* ── Data Panel ── */}
         <div style={{ background: 'rgba(15,23,42,0.5)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '24px', overflow: 'hidden', backdropFilter: 'blur(24px)' }}>
           {/* Tab bar */}
-          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '1.25rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {[
-                { id: 'users',    label: 'Users',    count: users.length },
-                { id: 'bookings', label: 'Bookings', count: bookings.length },
-                { id: 'seats',    label: 'Seats',    count: seats.length },
-                { id: 'kyc',      label: 'KYC',      count: kycRecords.length, accent: '#a855f7' },
+                { id: 'users',       label: 'Users',       count: users.length },
+                { id: 'bookings',    label: 'Bookings',    count: bookings.length },
+                { id: 'seats',       label: 'Seats',       count: seats.length },
+                { id: 'kyc',         label: 'KYC',         count: kycRecords.length, accent: '#a855f7' },
+                { id: 'new-booking', label: 'New Booking', count: adminAvailableSeats.length, accent: '#22c55e' },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -386,17 +498,17 @@ const AdminCRM = () => {
                     padding: '0.5rem 1.1rem', borderRadius: '999px', cursor: 'pointer',
                     fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em',
                     transition: 'all 0.2s',
-                    background: activeTab === t.id ? `rgba(${t.accent === '#a855f7' ? '168,85,247' : '0,242,254'},0.08)` : 'transparent',
-                    border: activeTab === t.id ? `1px solid rgba(${t.accent === '#a855f7' ? '168,85,247' : '0,242,254'},0.25)` : '1px solid transparent',
+                    background: activeTab === t.id ? `rgba(${t.accent === '#a855f7' ? '168,85,247' : t.accent === '#22c55e' ? '34,197,94' : '0,242,254'},0.08)` : 'transparent',
+                    border: activeTab === t.id ? `1px solid rgba(${t.accent === '#a855f7' ? '168,85,247' : t.accent === '#22c55e' ? '34,197,94' : '0,242,254'},0.25)` : '1px solid transparent',
                     color: activeTab === t.id ? (t.accent || '#00f2fe') : '#334155',
                   }}
                 >
                   {t.label}
                   <span style={{
                     marginLeft: '0.4rem', fontSize: '0.52rem', fontWeight: 900,
-                    background: activeTab === t.id ? 'rgba(0,242,254,0.15)' : 'rgba(255,255,255,0.05)',
+                    background: activeTab === t.id ? `rgba(${t.accent === '#a855f7' ? '168,85,247' : t.accent === '#22c55e' ? '34,197,94' : '0,242,254'},0.15)` : 'rgba(255,255,255,0.05)',
                     borderRadius: '999px', padding: '0.1rem 0.45rem',
-                    color: activeTab === t.id ? '#00f2fe' : '#1e293b',
+                    color: activeTab === t.id ? (t.accent || '#00f2fe') : '#1e293b',
                   }}>
                     {t.count}
                   </span>
@@ -498,11 +610,11 @@ const AdminCRM = () => {
             </div>
           )}
 
-          {loading ? (
+          {activeTab !== 'kyc' && activeTab !== 'new-booking' && loading ? (
             <div className="flex items-center justify-center py-20 text-gray-500">
               <Loader2 size={24} className="animate-spin mr-3" /> Loading live data...
             </div>
-          ) : (
+          ) : activeTab !== 'kyc' && activeTab !== 'new-booking' ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -788,7 +900,7 @@ const AdminCRM = () => {
                 </tbody>
               </table>
             </div>
-          )}
+          ) : null}
         {/* ── KYC Panel ── */}
         {activeTab === 'kyc' && (
           <div>
@@ -880,7 +992,208 @@ const AdminCRM = () => {
             )}
           </div>
         )}
-        </div>
+
+        {/* ── New Booking Panel ── */}
+        {activeTab === 'new-booking' && (
+          <div style={{ padding: '2rem' }}>
+            {/* Header */}
+            <div style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                  <ShoppingCart size={16} color="#22c55e" />
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#22c55e' }}>Manual Booking</span>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0 }}>Select available seats, set duration, and optionally override the price.</p>
+              </div>
+              {adminBookingSuccess && (
+                <button
+                  onClick={() => setAdminBookingSuccess(null)}
+                  style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#22c55e', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '999px', padding: '0.4rem 1rem', cursor: 'pointer' }}
+                >
+                  + New Booking
+                </button>
+              )}
+            </div>
+
+            {/* Success state */}
+            {adminBookingSuccess ? (
+              <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '18px', padding: '2.5rem', textAlign: 'center', maxWidth: '480px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #22c55e, #00f2fe)' }} />
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+                  <CheckCircle size={28} color="#22c55e" />
+                </div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', color: '#fff', marginBottom: '0.4rem' }}>Booking Confirmed!</h3>
+                <p style={{ fontSize: '0.75rem', color: '#475569', marginBottom: '1rem' }}>
+                  Payment of <span style={{ color: '#22c55e', fontWeight: 700 }}>₹{Number(adminBookingSuccess.amount).toLocaleString('en-IN')}</span> processed successfully.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center' }}>
+                  {adminBookingSuccess.bookingIds.map((id) => (
+                    <span key={id} style={{ fontSize: '0.6rem', fontWeight: 800, fontFamily: 'monospace', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '6px', padding: '0.25rem 0.6rem', color: '#22c55e', letterSpacing: '0.08em' }}>
+                      {id.slice(0, 8).toUpperCase()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+
+                {/* LEFT — Seat selector */}
+                <div>
+                  <div style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#475569', marginBottom: '0.75rem' }}>
+                    Available Seats <span style={{ color: '#334155', fontWeight: 700 }}>({adminAvailableSeats.length})</span>
+                  </div>
+                  {adminAvailableSeats.length === 0 ? (
+                    <p style={{ fontSize: '0.78rem', color: '#334155', padding: '1.5rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      No available seats right now.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                      {['workstation', 'cabin', 'meeting_room', 'conference'].map((type) => {
+                        const typeSeats = adminAvailableSeats.filter((s) => s.type === type);
+                        if (typeSeats.length === 0) return null;
+                        const typeLabel = { workstation: 'Workstations', cabin: 'Cabins', meeting_room: 'Meeting Rooms', conference: 'Conference Rooms' }[type];
+                        const typeColor = { workstation: '#38bdf8', cabin: '#a855f7', meeting_room: '#fbbf24', conference: '#34d399' }[type];
+                        return (
+                          <div key={type}>
+                            <div style={{ fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: typeColor, marginBottom: '0.3rem', marginTop: '0.5rem', paddingLeft: '0.25rem' }}>{typeLabel}</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                              {typeSeats.map((seat) => {
+                                const selected = adminSelectedIds.includes(seat.id);
+                                return (
+                                  <button
+                                    key={seat.id}
+                                    onClick={() => setAdminSelectedIds((prev) =>
+                                      selected ? prev.filter((id) => id !== seat.id) : [...prev, seat.id]
+                                    )}
+                                    style={{
+                                      padding: '0.4rem 0.7rem', borderRadius: '8px', cursor: 'pointer',
+                                      background: selected ? `rgba(${typeColor === '#38bdf8' ? '56,189,248' : typeColor === '#a855f7' ? '168,85,247' : typeColor === '#fbbf24' ? '251,191,36' : '52,211,153'},0.12)` : 'rgba(255,255,255,0.04)',
+                                      border: selected ? `1px solid ${typeColor}55` : '1px solid rgba(255,255,255,0.08)',
+                                      transition: 'all 0.15s',
+                                    }}
+                                  >
+                                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: selected ? typeColor : '#94a3b8', fontFamily: 'monospace' }}>{seat.code}</div>
+                                    <div style={{ fontSize: '0.52rem', color: selected ? typeColor : '#334155', fontWeight: 700 }}>₹{computeSeatPrice(seat.type, adminDurationUnit, adminDurationQty).toLocaleString('en-IN')}</div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* RIGHT — Duration + Amount + Pay */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+                  {/* Duration */}
+                  <div>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#475569', marginBottom: '0.6rem' }}>Duration</div>
+                    <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem' }}>
+                      {['hourly', 'daily', 'monthly'].map((unit) => (
+                        <button key={unit} onClick={() => setAdminDurationUnit(unit)} style={{
+                          flex: 1, padding: '0.55rem 0.25rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
+                          background: adminDurationUnit === unit ? 'rgba(0,242,254,0.08)' : 'rgba(255,255,255,0.03)',
+                          border: adminDurationUnit === unit ? '1px solid rgba(0,242,254,0.3)' : '1px solid rgba(255,255,255,0.07)',
+                          fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em',
+                          color: adminDurationUnit === unit ? '#00f2fe' : '#475569', transition: 'all 0.15s',
+                        }}>
+                          {unit}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <label style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#475569' }}>Qty</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <button onClick={() => setAdminDurationQty((q) => Math.max(1, q - 1))} style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#e2e8f0', minWidth: '24px', textAlign: 'center' }}>{adminDurationQty}</span>
+                        <button onClick={() => setAdminDurationQty((q) => q + 1)} style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Amount summary */}
+                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px', padding: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.62rem', color: '#475569', fontWeight: 700 }}>Computed total</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>₹{adminComputedTotal.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    {/* Custom amount toggle */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: adminUseCustom ? '0.75rem' : 0 }}>
+                      <input type="checkbox" checked={adminUseCustom} onChange={(e) => { setAdminUseCustom(e.target.checked); if (!e.target.checked) setAdminCustomAmount(''); }} style={{ accentColor: '#22c55e', width: '14px', height: '14px' }} />
+                      <span style={{ fontSize: '0.6rem', fontWeight: 700, color: adminUseCustom ? '#22c55e' : '#475569', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Override with custom amount</span>
+                    </label>
+
+                    {adminUseCustom && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '10px', padding: '0.5rem 0.75rem' }}>
+                        <IndianRupee size={13} color="#22c55e" />
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Enter total amount"
+                          value={adminCustomAmount}
+                          onChange={(e) => setAdminCustomAmount(e.target.value)}
+                          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#22c55e', fontSize: '0.85rem', fontWeight: 800 }}
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: '0.75rem', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#334155' }}>Final Amount</span>
+                      <span style={{ fontSize: '1.4rem', fontWeight: 900, background: 'linear-gradient(135deg, #22c55e, #00f2fe)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                        ₹{adminFinalAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Selected seats summary */}
+                  {adminSelectedIds.length > 0 && (
+                    <div style={{ fontSize: '0.62rem', color: '#475569' }}>
+                      <span style={{ fontWeight: 800, color: '#22c55e' }}>{adminSelectedIds.length}</span> seat{adminSelectedIds.length !== 1 ? 's' : ''} selected
+                      {' · '}
+                      <button onClick={() => setAdminSelectedIds([])} style={{ background: 'none', border: 'none', color: '#475569', fontSize: '0.6rem', cursor: 'pointer', textDecoration: 'underline' }}>Clear</button>
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {adminBookingError && (
+                    <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '0.65rem 0.9rem', color: '#fca5a5', fontSize: '0.72rem' }}>
+                      {adminBookingError}
+                    </div>
+                  )}
+
+                  {/* Pay button */}
+                  <button
+                    onClick={handleAdminPayment}
+                    disabled={adminBookingLoading || adminSelectedIds.length === 0}
+                    style={{
+                      width: '100%', padding: '0.9rem 1.5rem', borderRadius: '14px', border: 'none',
+                      background: adminSelectedIds.length === 0 || adminBookingLoading
+                        ? 'rgba(255,255,255,0.05)'
+                        : 'linear-gradient(135deg, #22c55e, #00f2fe)',
+                      color: adminSelectedIds.length === 0 || adminBookingLoading ? '#334155' : '#000',
+                      fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em',
+                      cursor: adminSelectedIds.length === 0 || adminBookingLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                      boxShadow: adminSelectedIds.length > 0 && !adminBookingLoading ? '0 4px 24px rgba(34,197,94,0.25)' : 'none',
+                      transition: 'all 0.25s',
+                    }}
+                  >
+                    {adminBookingLoading ? (
+                      <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Processing…</>
+                    ) : (
+                      <><Zap size={14} /> Process Payment — ₹{adminFinalAmount.toLocaleString('en-IN')}</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       </div>
 
       {/* ── Timed Lock Dialog ── */}

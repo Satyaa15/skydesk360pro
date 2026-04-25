@@ -196,3 +196,13 @@ export const verifyPayment = async (payload) => {
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 };
+
+export const createAdminBookingOrder = async (payload) => {
+  const res = await fetch(`${API_BASE_URL}/admin/bookings/create-order`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};

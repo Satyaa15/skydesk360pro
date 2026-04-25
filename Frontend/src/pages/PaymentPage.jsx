@@ -123,6 +123,15 @@ const PaymentPage = () => {
         order_id: order.razorpay_order_id,
         prefill: { name: user?.full_name || '', email: user?.email || '' },
         theme: { color: '#00f2fe' },
+        config: {
+          display: {
+            blocks: {
+              qr: { name: 'Scan & Pay (QR)', instruments: [{ method: 'upi', flows: ['qr'] }] },
+            },
+            sequence: ['block.qr'],
+            preferences: { show_default_blocks: true },
+          },
+        },
         handler: async (response) => {
           try {
             await verifyPayment({
@@ -181,7 +190,7 @@ const PaymentPage = () => {
       </div>
 
       {/* ── Two-column layout ── */}
-      <div style={{ maxWidth: '940px', margin: '0 auto', padding: '1.5rem 1.5rem 4rem', display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      <div style={{ maxWidth: '940px', margin: '0 auto', padding: '1rem 1rem 4rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
 
         {/* ── LEFT — Payment form ── */}
         <div style={{ flex: '1 1 420px' }}>
@@ -320,7 +329,7 @@ const PaymentPage = () => {
         </div>
 
         {/* ── RIGHT — Order Summary ── */}
-        <div style={{ flex: '0 0 300px', position: 'sticky', top: '100px' }}>
+        <div style={{ flex: '1 1 280px', minWidth: '280px', position: 'sticky', top: '100px' }}>
           <div style={{
             background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(24px)',
             border: '1px solid rgba(255,255,255,0.07)', borderRadius: '22px',
