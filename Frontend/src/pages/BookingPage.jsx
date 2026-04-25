@@ -13,15 +13,21 @@ const WORKSPACE_LABELS = {
   conference: 'Conference',
 };
 
-// Cabins must be booked as a whole unit.
-// Key = zone name, value = the one representative seat ID sent to the backend.
-const CABIN_PRIMARY_SEAT = {
-  "CEO's Cabin":      'CEO-1',
-  "Director's Cabin": 'DIR-1',
+// These workspace types must be booked as a whole unit — no individual seat selection.
+const WHOLE_UNIT_TYPES = new Set(['cabin', 'conference', 'meeting_room']);
+
+// Key = zone name → primary seat ID sent to the backend (one booking = one price).
+const ZONE_PRIMARY_SEAT = {
+  "CEO's Cabin":                      'CEO-1',
+  "Director's Cabin":                 'DIR-1',
+  "Convertible 10 Seater Conference": 'CONF-1',
+  "2 Seater Meeting Room":            'MR-1',
 };
-const CABIN_ZONE_LABEL = {
-  "CEO's Cabin":      "CEO's Cabin (3-seat unit)",
-  "Director's Cabin": "Director's Cabin (5-seat unit)",
+const ZONE_DISPLAY_LABEL = {
+  "CEO's Cabin":                      "CEO's Cabin (3-seat unit)",
+  "Director's Cabin":                 "Director's Cabin (5-seat unit)",
+  "Convertible 10 Seater Conference": "Conference Room (10-seat unit)",
+  "2 Seater Meeting Room":            "Meeting Room (2-seat unit)",
 };
 
 const WORKSPACE_FILTERS = [
@@ -332,11 +338,11 @@ const FloorPlanSVG = React.memo(({ visibleSeats, isSeatSelected, toggleSeat, hov
               <rect x={cx - 65} y={cy - 38} width="130" height="42" rx="6"
                 fill="rgba(15,23,42,0.95)" stroke="rgba(0,242,254,0.3)" strokeWidth="0.8" />
               <text x={cx} y={cy - 25} className="tooltip-title">
-                {seat.workspaceType === 'cabin' ? seat.zone : `${seat.id} — ${seat.zone}`}
+                {WHOLE_UNIT_TYPES.has(seat.workspaceType) ? seat.zone : `${seat.id} — ${seat.zone}`}
               </text>
-              {seat.workspaceType === 'cabin' && (
+              {WHOLE_UNIT_TYPES.has(seat.workspaceType) && (
                 <text x={cx} y={cy - 14} className="tooltip-title" style={{ fontSize: '5.5px', fill: '#a855f7' }}>
-                  Whole cabin — click to book entire unit
+                  Click to book entire unit exclusively
                 </text>
               )}
               <text x={cx} y={cy - 4} className="tooltip-price">₹{formatPrice(seat.displayPrice ?? seat.price)}/{durationUnit}</text>
@@ -441,17 +447,17 @@ const BookingPage = () => {
       };
     });
 
-    // Second pass: for cabin zones, if the PRIMARY seat is unavailable/locked
-    // mark ALL seats in that zone the same way (cabin = whole-unit booking).
-    const cabinZoneStatus = {};
-    Object.entries(CABIN_PRIMARY_SEAT).forEach(([zone, primaryId]) => {
+    // Second pass: for whole-unit zones, propagate primary seat's availability
+    // to every seat in that zone so they all show the same state.
+    const zoneStatus = {};
+    Object.entries(ZONE_PRIMARY_SEAT).forEach(([zone, primaryId]) => {
       const primary = base.find((s) => s.id === primaryId);
-      if (primary) cabinZoneStatus[zone] = { booked: primary.booked, locked: primary.locked, lockedUntil: primary.lockedUntil };
+      if (primary) zoneStatus[zone] = { booked: primary.booked, locked: primary.locked, lockedUntil: primary.lockedUntil };
     });
 
     return base.map((seat) => {
-      if (seat.workspaceType !== 'cabin') return seat;
-      const status = cabinZoneStatus[seat.zone];
+      if (!WHOLE_UNIT_TYPES.has(seat.workspaceType)) return seat;
+      const status = zoneStatus[seat.zone];
       if (!status) return seat;
       return { ...seat, booked: status.booked, locked: status.locked, lockedUntil: status.lockedUntil };
     });
@@ -473,16 +479,18 @@ const BookingPage = () => {
     return { seatTotal, availableSeats };
   }, [enrichedSeats]);
 
-  // For cabins: clicking any seat in a zone selects/deselects the PRIMARY seat only.
-  // This sends one seat_id to the backend → charges cabin price once.
+  // Whole-unit types: clicking any seat selects the PRIMARY seat only.
+  // One seat_id → backend → price charged once for the whole room/cabin.
   const toggleSeat = useCallback((seat) => {
-    if (seat.workspaceType === 'cabin') {
-      const primaryId = CABIN_PRIMARY_SEAT[seat.zone];
+    if (WHOLE_UNIT_TYPES.has(seat.workspaceType)) {
+      const primaryId = ZONE_PRIMARY_SEAT[seat.zone];
       const primarySeat = enrichedSeats.find((s) => s.id === primaryId);
       if (!primarySeat || !primarySeat.dbId) return;
       setSelectedSeats((prev) => {
         const exists = prev.find((s) => s.id === primaryId);
-        return exists ? prev.filter((s) => s.id !== primaryId) : [...prev, { ...primarySeat, _cabinZone: seat.zone }];
+        return exists
+          ? prev.filter((s) => s.id !== primaryId)
+          : [...prev, { ...primarySeat, _unitZone: seat.zone }];
       });
     } else {
       setSelectedSeats((prev) => {
@@ -492,11 +500,11 @@ const BookingPage = () => {
     }
   }, [enrichedSeats]);
 
-  // A cabin seat looks "selected" if its zone's primary seat is selected.
+  // A whole-unit seat appears "selected" when its zone's primary seat is selected.
   const isSeatSelected = useCallback((seatId) => {
     const seat = enrichedSeats.find((s) => s.id === seatId);
-    if (seat?.workspaceType === 'cabin') {
-      const primaryId = CABIN_PRIMARY_SEAT[seat.zone];
+    if (seat && WHOLE_UNIT_TYPES.has(seat.workspaceType)) {
+      const primaryId = ZONE_PRIMARY_SEAT[seat.zone];
       return selectedSeats.some((s) => s.id === primaryId);
     }
     return selectedSeats.some((s) => s.id === seatId);
@@ -717,11 +725,11 @@ const BookingPage = () => {
                 <div className="bp-seats-list">
                   <AnimatePresence>
                     {selectedSeats.map((seat) => {
-                      const isCabin = seat.workspaceType === 'cabin';
-                      const displayName = isCabin
-                        ? (CABIN_ZONE_LABEL[seat._cabinZone || seat.zone] || seat.zone)
+                      const isUnit = WHOLE_UNIT_TYPES.has(seat.workspaceType);
+                      const displayName = isUnit
+                        ? (ZONE_DISPLAY_LABEL[seat._unitZone || seat.zone] || seat.zone)
                         : seat.id;
-                      const displayZone = isCabin ? 'Whole cabin — book as one unit' : seat.zone;
+                      const displayZone = isUnit ? 'Whole unit — booked exclusively' : seat.zone;
                       return (
                         <motion.div
                           key={seat.id}
