@@ -6,12 +6,12 @@ from datetime import datetime, timedelta
 from app.models.models import BookingDuration
 
 # ── Official rate card ───────────────────────────────────────────────────────
-# All amounts in INR.  Yearly = monthly × 12 × 10% discount.
+# All amounts in INR.  Explicit yearly keys override the monthly × 12 × 0.9 formula.
 SEAT_PRICES: dict[str, dict[str, float]] = {
-    "workstation": {"hourly": 100.0,  "daily": 500.0,   "monthly": 7_500.0},
-    "cabin":       {"hourly": 500.0,  "daily": 2_500.0,  "monthly": 40_000.0},
-    "conference":  {"hourly": 700.0,  "daily": 4_500.0,  "monthly": 90_000.0},
-    "meeting_room":{"hourly": 700.0,  "daily": 4_500.0,  "monthly": 90_000.0},
+    "workstation": {"hourly": 100.0,  "daily": 500.0,   "monthly": 7_500.0,  "yearly": 81_000.0},
+    "cabin":       {"hourly": 500.0,  "daily": 2_500.0,  "monthly": 40_000.0, "yearly": 432_000.0},
+    "conference":  {"hourly": 700.0,  "daily": 4_500.0,  "monthly": 90_000.0, "yearly": 972_000.0},
+    "meeting_room":{"hourly": 700.0,  "daily": 4_500.0,  "monthly": 16_000.0, "yearly": 900_000.0},
 }
 _DEFAULT_TYPE = "workstation"
 _YEARLY_DISCOUNT = Decimal("0.90")
@@ -30,7 +30,7 @@ def compute_amount(seat_type: str, duration_unit: BookingDuration, quantity: int
     elif duration_unit == BookingDuration.DAILY:
         rate = _to_decimal(prices["daily"])
     elif duration_unit == BookingDuration.YEARLY:
-        rate = _to_decimal(prices["monthly"]) * Decimal("12") * _YEARLY_DISCOUNT
+        rate = _to_decimal(prices["yearly"]) if "yearly" in prices else _to_decimal(prices["monthly"]) * Decimal("12") * _YEARLY_DISCOUNT
     else:  # MONTHLY (default)
         rate = _to_decimal(prices["monthly"])
 

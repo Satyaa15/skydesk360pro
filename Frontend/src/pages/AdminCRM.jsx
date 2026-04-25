@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
   Users,
@@ -41,18 +41,10 @@ import {
   createAdminBookingOrder,
   verifyPayment,
 } from '../lib/api';
-
-const ADMIN_SEAT_PRICES = {
-  workstation:  { hourly: 100,  daily: 500,   monthly: 7500  },
-  cabin:        { hourly: 500,  daily: 2500,  monthly: 40000 },
-  conference:   { hourly: 700,  daily: 4500,  monthly: 90000 },
-  meeting_room: { hourly: 700,  daily: 4500,  monthly: 90000 },
-};
-const computeSeatPrice = (type, unit, qty = 1) => {
-  const prices = ADMIN_SEAT_PRICES[type] || ADMIN_SEAT_PRICES.workstation;
-  const rate = unit === 'hourly' ? prices.hourly : unit === 'daily' ? prices.daily : prices.monthly;
-  return rate * qty;
-};
+import {
+  FloorPlanSVG, FLOOR_PLAN_SEATS, ZONE_PRIMARY_SEAT,
+  WHOLE_UNIT_TYPES, computeDurationPrice,
+} from '../components/FloorPlan';
 
 const loadRazorpayScript = () => new Promise((resolve) => {
   if (window.Razorpay) { resolve(true); return; }
@@ -102,6 +94,9 @@ const AdminCRM = () => {
   const [adminBookingLoading, setAdminBookingLoading] = useState(false);
   const [adminBookingError, setAdminBookingError] = useState(null);
   const [adminBookingSuccess, setAdminBookingSuccess] = useState(null);
+  const [adminZoom, setAdminZoom] = useState(1);
+  const [adminHoveredSeat, setAdminHoveredSeat] = useState(null);
+  const adminMapRef = useRef(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -410,10 +405,76 @@ const AdminCRM = () => {
   };
 
   const adminAvailableSeats = seats.filter((s) => s.is_available && !s.is_locked);
-  const adminSelectedSeats = adminAvailableSeats.filter((s) => adminSelectedIds.includes(s.id));
-  const adminComputedTotal = adminSelectedSeats.reduce(
-    (sum, s) => sum + computeSeatPrice(s.type, adminDurationUnit, adminDurationQty), 0
+
+  const adminEnrichedSeats = useMemo(() => {
+    const backendMap = new Map(seats.map((s) => [s.code, s]));
+    const base = FLOOR_PLAN_SEATS.map((seat) => {
+      const bs = backendMap.get(seat.id);
+      if (!bs) return { ...seat, booked: true, locked: false, dbId: null, backendAvailable: false };
+      const isLocked = !!bs.locked_until;
+      return {
+        ...seat,
+        dbId: bs.id,
+        price: bs.price,
+        booked: !bs.is_available && !isLocked,
+        locked: isLocked,
+        backendAvailable: bs.is_available,
+      };
+    });
+    const zoneStatus = {};
+    Object.entries(ZONE_PRIMARY_SEAT).forEach(([zone, primaryId]) => {
+      const primary = base.find((s) => s.id === primaryId);
+      if (primary) zoneStatus[zone] = { booked: primary.booked, locked: primary.locked };
+    });
+    return base.map((seat) => {
+      if (!WHOLE_UNIT_TYPES.has(seat.workspaceType)) return seat;
+      const status = zoneStatus[seat.zone];
+      return status ? { ...seat, booked: status.booked, locked: status.locked } : seat;
+    });
+  }, [seats]);
+
+  const adminVisibleSeats = useMemo(() =>
+    adminEnrichedSeats.map((seat) => ({
+      ...seat,
+      displayPrice: computeDurationPrice(seat.workspaceType, adminDurationUnit, adminDurationQty),
+    })),
+    [adminEnrichedSeats, adminDurationUnit, adminDurationQty]
   );
+
+  const adminToggleSeat = useCallback((seat) => {
+    if (!seat.dbId || seat.booked || seat.locked) return;
+    if (WHOLE_UNIT_TYPES.has(seat.workspaceType)) {
+      const primaryId = ZONE_PRIMARY_SEAT[seat.zone];
+      const primary = adminEnrichedSeats.find((s) => s.id === primaryId);
+      if (!primary || !primary.dbId) return;
+      setAdminSelectedIds((prev) =>
+        prev.includes(primary.dbId) ? prev.filter((id) => id !== primary.dbId) : [...prev, primary.dbId]
+      );
+    } else {
+      setAdminSelectedIds((prev) =>
+        prev.includes(seat.dbId) ? prev.filter((id) => id !== seat.dbId) : [...prev, seat.dbId]
+      );
+    }
+  }, [adminEnrichedSeats]);
+
+  const adminIsSeatSelected = useCallback((seatId) => {
+    const seat = adminEnrichedSeats.find((s) => s.id === seatId);
+    if (!seat) return false;
+    if (WHOLE_UNIT_TYPES.has(seat.workspaceType)) {
+      const primaryId = ZONE_PRIMARY_SEAT[seat.zone];
+      const primary = adminEnrichedSeats.find((s) => s.id === primaryId);
+      return primary ? adminSelectedIds.includes(primary.dbId) : false;
+    }
+    return adminSelectedIds.includes(seat.dbId);
+  }, [adminSelectedIds, adminEnrichedSeats]);
+
+  const adminComputedTotal = useMemo(() =>
+    adminEnrichedSeats
+      .filter((s) => s.dbId && adminSelectedIds.includes(s.dbId))
+      .reduce((sum, s) => sum + computeDurationPrice(s.workspaceType, adminDurationUnit, adminDurationQty), 0),
+    [adminEnrichedSeats, adminSelectedIds, adminDurationUnit, adminDurationQty]
+  );
+
   const adminFinalAmount = adminUseCustom && adminCustomAmount && Number(adminCustomAmount) > 0
     ? Number(adminCustomAmount)
     : adminComputedTotal;
@@ -1035,54 +1096,44 @@ const AdminCRM = () => {
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: '1.5rem', alignItems: 'flex-start' }}>
 
-                {/* LEFT — Seat selector */}
+                {/* LEFT — Floor Map */}
                 <div>
-                  <div style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#475569', marginBottom: '0.75rem' }}>
-                    Available Seats <span style={{ color: '#334155', fontWeight: 700 }}>({adminAvailableSeats.length})</span>
-                  </div>
-                  {adminAvailableSeats.length === 0 ? (
-                    <p style={{ fontSize: '0.78rem', color: '#334155', padding: '1.5rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      No available seats right now.
-                    </p>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-                      {['workstation', 'cabin', 'meeting_room', 'conference'].map((type) => {
-                        const typeSeats = adminAvailableSeats.filter((s) => s.type === type);
-                        if (typeSeats.length === 0) return null;
-                        const typeLabel = { workstation: 'Workstations', cabin: 'Cabins', meeting_room: 'Meeting Rooms', conference: 'Conference Rooms' }[type];
-                        const typeColor = { workstation: '#38bdf8', cabin: '#a855f7', meeting_room: '#fbbf24', conference: '#34d399' }[type];
-                        return (
-                          <div key={type}>
-                            <div style={{ fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: typeColor, marginBottom: '0.3rem', marginTop: '0.5rem', paddingLeft: '0.25rem' }}>{typeLabel}</div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                              {typeSeats.map((seat) => {
-                                const selected = adminSelectedIds.includes(seat.id);
-                                return (
-                                  <button
-                                    key={seat.id}
-                                    onClick={() => setAdminSelectedIds((prev) =>
-                                      selected ? prev.filter((id) => id !== seat.id) : [...prev, seat.id]
-                                    )}
-                                    style={{
-                                      padding: '0.4rem 0.7rem', borderRadius: '8px', cursor: 'pointer',
-                                      background: selected ? `rgba(${typeColor === '#38bdf8' ? '56,189,248' : typeColor === '#a855f7' ? '168,85,247' : typeColor === '#fbbf24' ? '251,191,36' : '52,211,153'},0.12)` : 'rgba(255,255,255,0.04)',
-                                      border: selected ? `1px solid ${typeColor}55` : '1px solid rgba(255,255,255,0.08)',
-                                      transition: 'all 0.15s',
-                                    }}
-                                  >
-                                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: selected ? typeColor : '#94a3b8', fontFamily: 'monospace' }}>{seat.code}</div>
-                                    <div style={{ fontSize: '0.52rem', color: selected ? typeColor : '#334155', fontWeight: 700 }}>₹{computeSeatPrice(seat.type, adminDurationUnit, adminDurationQty).toLocaleString('en-IN')}</div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#475569' }}>
+                      Floor Map <span style={{ color: '#334155' }}>({adminAvailableSeats.length} available)</span>
                     </div>
-                  )}
+                    <div style={{ display: 'flex', gap: '0.3rem' }}>
+                      {[
+                        { label: '+', action: () => setAdminZoom((z) => Math.min(z + 0.25, 3)) },
+                        { label: '−', action: () => setAdminZoom((z) => Math.max(z - 0.25, 0.5)) },
+                        { label: '↺', action: () => setAdminZoom(1) },
+                      ].map(({ label, action }) => (
+                        <button key={label} onClick={action} style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{label}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div
+                    ref={adminMapRef}
+                    className="bp-map-canvas-wrapper"
+                    onWheel={(e) => { e.preventDefault(); const d = e.deltaY > 0 ? -0.1 : 0.1; setAdminZoom((z) => Math.min(Math.max(z + d, 0.5), 3)); }}
+                    style={{ overflow: 'hidden', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', background: '#080d1a', cursor: 'default' }}
+                  >
+                    <div style={{ transform: `scale(${adminZoom})`, transformOrigin: 'top left', transition: 'transform 0.15s ease' }}>
+                      <FloorPlanSVG
+                        visibleSeats={adminVisibleSeats}
+                        isSeatSelected={adminIsSeatSelected}
+                        toggleSeat={adminToggleSeat}
+                        hoveredSeat={adminHoveredSeat}
+                        setHoveredSeat={setAdminHoveredSeat}
+                        durationUnit={adminDurationUnit}
+                      />
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.6rem', color: '#1e293b', marginTop: '0.5rem', textAlign: 'center' }}>
+                    Click a seat or zone to select · Scroll to zoom
+                  </p>
                 </div>
 
                 {/* RIGHT — Duration + Amount + Pay */}
@@ -1091,8 +1142,8 @@ const AdminCRM = () => {
                   {/* Duration */}
                   <div>
                     <div style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#475569', marginBottom: '0.6rem' }}>Duration</div>
-                    <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem' }}>
-                      {['hourly', 'daily', 'monthly'].map((unit) => (
+                    <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                      {['hourly', 'daily', 'monthly', 'yearly'].map((unit) => (
                         <button key={unit} onClick={() => setAdminDurationUnit(unit)} style={{
                           flex: 1, padding: '0.55rem 0.25rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
                           background: adminDurationUnit === unit ? 'rgba(0,242,254,0.08)' : 'rgba(255,255,255,0.03)',

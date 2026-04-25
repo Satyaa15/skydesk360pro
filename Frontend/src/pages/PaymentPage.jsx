@@ -12,17 +12,17 @@ const DURATION_LABELS = { hourly: 'Hourly', daily: 'Daily', monthly: 'Monthly', 
 
 // Must stay in sync with backend pricing.SEAT_PRICES
 const SEAT_PRICES = {
-  workstation:  { hourly: 100,  daily: 500,   monthly: 7500  },
-  cabin:        { hourly: 500,  daily: 2500,  monthly: 40000 },
-  conference:   { hourly: 700,  daily: 4500,  monthly: 90000 },
-  meeting_room: { hourly: 700,  daily: 4500,  monthly: 90000 },
+  workstation:  { hourly: 100,  daily: 500,   monthly: 7500,  yearly: 81000   },
+  cabin:        { hourly: 500,  daily: 2500,  monthly: 40000, yearly: 432000  },
+  conference:   { hourly: 700,  daily: 4500,  monthly: 90000, yearly: 972000  },
+  meeting_room: { hourly: 700,  daily: 4500,  monthly: 16000, yearly: 900000  },
 };
 
 const computeDurationPrice = (workspaceType, durationUnit, quantity = 1) => {
   const prices = SEAT_PRICES[workspaceType] || SEAT_PRICES.workstation;
   const rate = durationUnit === 'hourly' ? prices.hourly
     : durationUnit === 'daily'   ? prices.daily
-    : durationUnit === 'yearly'  ? prices.monthly * 12 * 0.9
+    : durationUnit === 'yearly'  ? (prices.yearly ?? prices.monthly * 12 * 0.9)
     : prices.monthly;
   return rate * quantity;
 };

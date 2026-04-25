@@ -16,10 +16,10 @@ const TYPE_LABELS = {
 };
 
 const SEAT_PRICES = {
-  workstation:  { hourly: 100,  daily: 500,   monthly: 7500  },
-  cabin:        { hourly: 500,  daily: 2500,  monthly: 40000 },
-  conference:   { hourly: 700,  daily: 4500,  monthly: 90000 },
-  meeting_room: { hourly: 700,  daily: 4500,  monthly: 90000 },
+  workstation:  { hourly: 100,  daily: 500,   monthly: 7500,  yearly: 81000  },
+  cabin:        { hourly: 500,  daily: 2500,  monthly: 40000, yearly: 432000 },
+  conference:   { hourly: 700,  daily: 4500,  monthly: 90000, yearly: 972000 },
+  meeting_room: { hourly: 700,  daily: 4500,  monthly: 16000, yearly: 900000 },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ function unitRate(workspaceType, durationUnit) {
   const p = SEAT_PRICES[workspaceType] || SEAT_PRICES.workstation;
   if (durationUnit === 'hourly')  return p.hourly;
   if (durationUnit === 'daily')   return p.daily;
-  if (durationUnit === 'yearly')  return p.monthly * 12 * 0.9;
+  if (durationUnit === 'yearly')  return p.yearly ?? p.monthly * 12 * 0.9;
   return p.monthly;
 }
 
