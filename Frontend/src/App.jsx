@@ -23,7 +23,7 @@ function InactivityGuard() {
   const timerRef  = useRef(null);
 
   useEffect(() => {
-    const isLoggedIn = () => !!sessionStorage.getItem('token');
+    const isLoggedIn = () => !!localStorage.getItem('token');
 
     const resetTimer = () => {
       if (!isLoggedIn()) return;          // not logged in — nothing to guard
@@ -86,6 +86,26 @@ function BackendWakeBanner() {
   );
 }
 
+function NotFoundPage() {
+  return (
+    <div style={{
+      minHeight: '100vh', background: '#020204', display: 'flex',
+      flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      fontFamily: "'Inter', sans-serif", gap: '1.25rem',
+    }}>
+      <p style={{ fontSize: '0.55rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4em', color: '#1e293b', margin: 0 }}>
+        404
+      </p>
+      <h1 style={{ fontSize: 'clamp(2.5rem, 8vw, 5rem)', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.04em', color: '#0f172a', margin: 0 }}>
+        Not Found.
+      </h1>
+      <p style={{ fontSize: '0.75rem', color: '#1e293b', margin: 0 }}>
+        This page doesn't exist.
+      </p>
+    </div>
+  );
+}
+
 function App() {
   return (
     <>
@@ -122,7 +142,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
     </>

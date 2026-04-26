@@ -211,7 +211,7 @@ function BookingFlowVisual() {
 const Home = () => {
   const navigate = useNavigate();
   const [isLoaded, setIsLoaded] = useState(false);
-  const isLoggedIn = !!sessionStorage.getItem('token');
+  const isLoggedIn = !!localStorage.getItem('token');
   const position = [18.5523284, 73.7714723];
 
   const videoRef = useRef(null);
