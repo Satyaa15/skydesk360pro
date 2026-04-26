@@ -23,7 +23,7 @@ function InactivityGuard() {
   const timerRef  = useRef(null);
 
   useEffect(() => {
-    const isLoggedIn = () => !!localStorage.getItem('token');
+    const isLoggedIn = () => !!sessionStorage.getItem('token');
 
     const resetTimer = () => {
       if (!isLoggedIn()) return;          // not logged in — nothing to guard

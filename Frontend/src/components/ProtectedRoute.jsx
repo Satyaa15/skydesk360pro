@@ -3,16 +3,16 @@ import { Navigate, useLocation } from 'react-router-dom';
 
 const readUserFromStorage = () => {
   try {
-    const storedUser = localStorage.getItem('user');
+    const storedUser = sessionStorage.getItem('user');
     return storedUser ? JSON.parse(storedUser) : null;
   } catch {
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
     return null;
   }
 };
 
 const ProtectedRoute = ({ children, adminOnly = false }) => {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   const user = readUserFromStorage();
   const location = useLocation();
 

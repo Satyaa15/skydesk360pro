@@ -353,7 +353,7 @@ const AdminCRM = () => {
       const loaded = await loadRazorpayScript();
       if (!loaded) throw new Error('Failed to load Razorpay checkout.');
 
-      const adminUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
+      const adminUser = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}'); } catch { return {}; } })();
       const options = {
         key: order.key_id,
         amount: order.amount,
