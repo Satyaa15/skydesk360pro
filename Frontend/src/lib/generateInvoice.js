@@ -49,7 +49,7 @@ function gradientRect(doc, x, y, w, h, fromRgb, toRgb) {
 }
 
 // ── Main export ────────────────────────────────────────────────────────────
-export function generateInvoice({ user, seats, durationUnit, durationQuantity, bookingIds, total }) {
+export function generateInvoice({ user, seats, durationUnit, durationQuantity, bookingIds, total, gstNumber = '' }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
   const W  = 210;
@@ -124,11 +124,16 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
   doc.setTextColor(...HEADING);
   doc.text('TAX INVOICE', W - MR, y - 2, { align: 'right' });
 
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(...CYAN);
+  doc.text(`Invoice No: ${invoiceNo}`, W - MR, y + 5, { align: 'right' });
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(...MUTED);
-  doc.text(`Invoice No: ${invoiceNo}`, W - MR, y + 5,  { align: 'right' });
-  doc.text(`Date: ${dateStr}`,         W - MR, y + 10, { align: 'right' });
+  doc.text(`Date: ${dateStr}`, W - MR, y + 10, { align: 'right' });
+  doc.text('SAC Code: 997212', W - MR, y + 15, { align: 'right' });
 
   // ── Divider ───────────────────────────────────────────────────────────────
   y = 36;
@@ -176,8 +181,15 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(...MUTED);
-  doc.text(user?.email || '',     col2X, y + 12.5);
-  doc.text('SkyDesk360 Member',   col2X, y + 18);
+  doc.text(user?.email || '',   col2X, y + 12.5);
+  if (gstNumber) {
+    doc.setTextColor(...CYAN);
+    doc.text(`GSTIN: ${gstNumber}`, col2X, y + 18);
+    doc.setTextColor(...MUTED);
+    doc.text('SkyDesk360 Member',   col2X, y + 23.5);
+  } else {
+    doc.text('SkyDesk360 Member',   col2X, y + 18);
+  }
 
   // ── Booking reference box ─────────────────────────────────────────────────
   y = 76;
@@ -212,10 +224,11 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
 
   const COL = {
     seat:      ML,
-    zone:      ML + 34,
-    type:      ML + 60,
-    period:    ML + 110,
-    unitPrice: ML + 142,
+    zone:      ML + 28,
+    type:      ML + 52,
+    hsn:       ML + 100,
+    period:    ML + 116,
+    unitPrice: ML + 143,
     amount:    W - MR,
   };
 
@@ -233,6 +246,7 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
     { label: 'SEAT ID',        x: COL.seat + 2,      align: 'left'  },
     { label: 'ZONE',           x: COL.zone + 2,      align: 'left'  },
     { label: 'WORKSPACE TYPE', x: COL.type + 2,      align: 'left'  },
+    { label: 'SAC/HSN',        x: COL.hsn + 2,       align: 'left'  },
     { label: 'BILLING PERIOD', x: COL.period + 2,    align: 'left'  },
     { label: 'UNIT PRICE',     x: COL.unitPrice + 2, align: 'left'  },
     { label: 'AMOUNT',         x: COL.amount - 2,    align: 'right' },
@@ -273,6 +287,16 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
     doc.setTextColor(...BODY);
     doc.text(seat.zone || '—',               COL.zone + 2,      textY);
     doc.text(TYPE_LABELS[wType] || wType,     COL.type + 2,      textY);
+
+    // SAC/HSN code — always 997212 for coworking
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...PURPLE);
+    doc.text('997212',                        COL.hsn + 2,       textY);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...BODY);
     doc.text(period,                          COL.period + 2,    textY);
     doc.text(fmtPrice(rate1),                 COL.unitPrice + 2, textY);
 

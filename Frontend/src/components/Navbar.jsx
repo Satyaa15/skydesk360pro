@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, User as UserIcon, LayoutDashboard, Menu, X } from 'lucide-react';
+import { LogOut, User as UserIcon, LayoutDashboard, Menu, X, Sun, Moon } from 'lucide-react';
 import { clearAuthSession } from '../lib/api';
+import { useTheme, useColors } from '../contexts/ThemeContext';
 
 const getStoredUser = () => {
   try {
@@ -18,6 +19,8 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { isDark, toggleTheme } = useTheme();
+  const colors = useColors();
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 30);
@@ -38,18 +41,22 @@ export default function Navbar() {
     navigate('/signin');
   };
 
+  const navBg = scrolled
+    ? colors.bgNav
+    : isDark
+      ? 'linear-gradient(180deg, rgba(0,0,0,0.80) 0%, transparent 100%)'
+      : 'linear-gradient(180deg, rgba(248,250,252,0.95) 0%, transparent 100%)';
+
   return (
     <>
       <nav
         className="fixed top-0 w-full z-50 transition-all duration-500"
         style={{
-          background: scrolled
-            ? 'rgba(2, 2, 4, 0.94)'
-            : 'linear-gradient(180deg, rgba(0,0,0,0.80) 0%, transparent 100%)',
+          background: navBg,
           backdropFilter: scrolled ? 'blur(28px)' : 'none',
           WebkitBackdropFilter: scrolled ? 'blur(28px)' : 'none',
-          borderBottom: scrolled ? '1px solid rgba(255,255,255,0.05)' : 'none',
-          boxShadow: scrolled ? '0 4px 40px rgba(0,0,0,0.5)' : 'none',
+          borderBottom: scrolled ? colors.navBorder : 'none',
+          boxShadow: scrolled ? colors.navShadow : 'none',
         }}
       >
         <div className="max-w-7xl mx-auto flex justify-between items-center px-6 md:px-10"
@@ -57,7 +64,7 @@ export default function Navbar() {
 
           {/* Logo */}
           <Link to="/" className="no-underline flex items-baseline gap-0.5">
-            <span className="text-white font-black italic" style={{ fontSize: '1.1rem', letterSpacing: '-0.01em' }}>
+            <span className="font-black italic" style={{ fontSize: '1.1rem', letterSpacing: '-0.01em', color: colors.text }}>
               SKY
             </span>
             <span
@@ -91,7 +98,7 @@ export default function Navbar() {
               style={{
                 fontSize: '0.4rem',
                 letterSpacing: '0.25em',
-                color: '#334155',
+                color: colors.textSubtle,
                 textTransform: 'uppercase',
                 alignSelf: 'flex-end',
                 paddingBottom: '1px',
@@ -102,23 +109,57 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-8">
-            <NavLink to="/">Home</NavLink>
+          <div className="hidden md:flex items-center gap-6">
+            <NavLink to="/" colors={colors}>Home</NavLink>
             {isHome ? (
               <a
                 href="#pricing"
                 className="no-underline transition-colors duration-200"
-                style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#64748b' }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#e2e8f0')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
+                style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: colors.textMuted }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = colors.text)}
+                onMouseLeave={(e) => (e.currentTarget.style.color = colors.textMuted)}
               >
                 Pricing
               </a>
             ) : (
-              <NavLink to="/#pricing">Pricing</NavLink>
+              <NavLink to="/#pricing" colors={colors}>Pricing</NavLink>
             )}
 
-            <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.07)' }} />
+            <div style={{ width: '1px', height: '14px', background: colors.border }} />
+
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)',
+                border: `1px solid ${colors.border}`,
+                cursor: 'pointer',
+                color: colors.textMuted,
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = isDark ? 'rgba(0,242,254,0.08)' : 'rgba(0,0,0,0.1)';
+                e.currentTarget.style.color = '#00f2fe';
+                e.currentTarget.style.borderColor = 'rgba(0,242,254,0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)';
+                e.currentTarget.style.color = colors.textMuted;
+                e.currentTarget.style.borderColor = colors.border;
+              }}
+            >
+              {isDark ? <Sun size={14} /> : <Moon size={14} />}
+            </button>
+
+            <div style={{ width: '1px', height: '14px', background: colors.border }} />
 
             {user ? (
               <>
@@ -134,12 +175,12 @@ export default function Navbar() {
                   >
                     <UserIcon size={11} color="#00f2fe" />
                   </div>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#cbd5e1' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: colors.text }}>
                     {user.fullName || user.name || 'User'}
                   </span>
                 </div>
 
-                <NavLink to="/book" accent>Book Seat</NavLink>
+                <NavLink to="/book" colors={colors} accent>Book Seat</NavLink>
 
                 {isAdmin && (
                   <Link
@@ -157,16 +198,16 @@ export default function Navbar() {
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-1.5 bg-none border-none cursor-pointer transition-colors duration-200"
-                  style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#475569', background: 'none', border: 'none' }}
+                  style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: colors.textMuted, background: 'none', border: 'none' }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = '#f87171')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#475569')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = colors.textMuted)}
                 >
                   <LogOut size={11} /> Out
                 </button>
               </>
             ) : (
               <>
-                <NavLink to="/signin">Sign In</NavLink>
+                <NavLink to="/signin" colors={colors}>Sign In</NavLink>
                 <Link
                   to="/register"
                   className="no-underline transition-all duration-200"
@@ -175,19 +216,13 @@ export default function Navbar() {
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '0.14em',
-                    color: '#94a3b8',
+                    color: colors.textMuted,
                     padding: '0.45rem 1.1rem',
-                    border: '1px solid rgba(148,163,184,0.2)',
+                    border: `1px solid ${colors.border}`,
                     borderRadius: '999px',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(0,242,254,0.4)';
-                    e.currentTarget.style.color = '#00f2fe';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(148,163,184,0.2)';
-                    e.currentTarget.style.color = '#94a3b8';
-                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(0,242,254,0.4)'; e.currentTarget.style.color = '#00f2fe'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.color = colors.textMuted; }}
                 >
                   Register
                 </Link>
@@ -205,14 +240,8 @@ export default function Navbar() {
                     background: 'linear-gradient(135deg, #00f2fe, #a855f7)',
                     boxShadow: '0 0 20px rgba(0,242,254,0.2)',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 0 32px rgba(0,242,254,0.35)';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = '0 0 20px rgba(0,242,254,0.2)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 0 32px rgba(0,242,254,0.35)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 0 20px rgba(0,242,254,0.2)'; e.currentTarget.style.transform = 'translateY(0)'; }}
                 >
                   Book Now
                 </Link>
@@ -220,22 +249,36 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile menu button */}
-          <button
-            className="md:hidden flex items-center justify-center"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.25rem' }}
-            onClick={() => setMobileOpen((v) => !v)}
-          >
-            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          {/* Mobile controls */}
+          <div className="md:hidden flex items-center gap-3">
+            <button
+              onClick={toggleTheme}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '30px', height: '30px', borderRadius: '8px',
+                background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)',
+                border: `1px solid ${colors.border}`,
+                cursor: 'pointer', color: colors.textMuted,
+              }}
+            >
+              {isDark ? <Sun size={13} /> : <Moon size={13} />}
+            </button>
+            <button
+              className="flex items-center justify-center"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, padding: '0.25rem' }}
+              onClick={() => setMobileOpen((v) => !v)}
+            >
+              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile dropdown */}
         {mobileOpen && (
           <div
             style={{
-              borderTop: '1px solid rgba(255,255,255,0.05)',
-              background: 'rgba(2,2,4,0.98)',
+              borderTop: `1px solid ${colors.borderMarquee}`,
+              background: colors.bgMobile,
               backdropFilter: 'blur(28px)',
               padding: '1.25rem 1.5rem',
               display: 'flex',
@@ -243,16 +286,16 @@ export default function Navbar() {
               gap: '1rem',
             }}
           >
-            <MobileLink to="/">Home</MobileLink>
+            <MobileLink to="/" colors={colors}>Home</MobileLink>
             {isHome ? (
-              <a href="#pricing" style={mobileLinkStyle}>Pricing</a>
+              <a href="#pricing" style={{ ...mobileLinkStyle, color: colors.textMuted }}>Pricing</a>
             ) : (
-              <MobileLink to="/#pricing">Pricing</MobileLink>
+              <MobileLink to="/#pricing" colors={colors}>Pricing</MobileLink>
             )}
-            <MobileLink to="/book">Book Seat</MobileLink>
+            <MobileLink to="/book" colors={colors}>Book Seat</MobileLink>
             {user ? (
               <>
-                {isAdmin && <MobileLink to="/crm">Admin CRM</MobileLink>}
+                {isAdmin && <MobileLink to="/crm" colors={colors}>Admin CRM</MobileLink>}
                 <button
                   onClick={handleLogout}
                   style={{ ...mobileLinkStyle, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, color: '#f87171' }}
@@ -262,8 +305,8 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <MobileLink to="/signin">Sign In</MobileLink>
-                <MobileLink to="/register">Register</MobileLink>
+                <MobileLink to="/signin" colors={colors}>Sign In</MobileLink>
+                <MobileLink to="/register" colors={colors}>Register</MobileLink>
               </>
             )}
           </div>
@@ -279,26 +322,25 @@ const mobileLinkStyle = {
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.14em',
-  color: '#64748b',
 };
 
-function NavLink({ to, children, accent }) {
+function NavLink({ to, children, accent, colors }) {
   return (
     <Link
       to={to}
       className="no-underline transition-colors duration-200"
-      style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: accent ? '#00f2fe' : '#64748b' }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = accent ? '#67e8f9' : '#e2e8f0')}
-      onMouseLeave={(e) => (e.currentTarget.style.color = accent ? '#00f2fe' : '#64748b')}
+      style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: accent ? '#00f2fe' : colors.textMuted }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = accent ? '#67e8f9' : colors.text)}
+      onMouseLeave={(e) => (e.currentTarget.style.color = accent ? '#00f2fe' : colors.textMuted)}
     >
       {children}
     </Link>
   );
 }
 
-function MobileLink({ to, children }) {
+function MobileLink({ to, children, colors }) {
   return (
-    <Link to={to} style={mobileLinkStyle} className="no-underline">
+    <Link to={to} style={{ ...mobileLinkStyle, color: colors.textMuted }} className="no-underline">
       {children}
     </Link>
   );

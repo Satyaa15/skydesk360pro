@@ -7,7 +7,7 @@ import {
 import {
   Shield, Zap, Coffee, Monitor, Car, Globe, ArrowRight,
   MapPin, Play, Pause, RotateCcw, FastForward, Rewind,
-  Wifi, Building2, Users, Clock, ChevronRight
+  Wifi, Building2, Users, Clock, ChevronRight, Calendar
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -22,6 +22,7 @@ L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, 
 import ScrollCanvas from '../components/ScrollCanvas';
 import PriceCard from '../components/PriceCard';
 import Footer from '../components/Footer';
+import { useTheme, useColors } from '../contexts/ThemeContext';
 
 /* ─── Reusable 3-D Tilt Card ─── */
 function TiltCard({ children, className, style }) {
@@ -78,9 +79,9 @@ const MARQUEE_ITEMS = [
   'MEETING PODS', 'GOURMET COFFEE', 'BIOMETRIC SECURITY',
 ];
 
-function MarqueeStrip() {
+function MarqueeStrip({ colors }) {
   return (
-    <div style={{ overflow: 'hidden', borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.4)', padding: '1rem 0', position: 'relative', zIndex: 20 }}>
+    <div style={{ overflow: 'hidden', borderTop: `1px solid ${colors.borderMarquee}`, borderBottom: `1px solid ${colors.borderMarquee}`, background: colors.bgMarquee, padding: '1rem 0', position: 'relative', zIndex: 20 }}>
       <div style={{ display: 'flex', animation: 'marqueeScroll 28s linear infinite', width: 'max-content', gap: '3rem', alignItems: 'center' }}>
         {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((item, i) => (
           <React.Fragment key={i}>
@@ -247,11 +248,15 @@ const Home = () => {
     { icon: <Car className="w-7 h-7" style={{ color: '#ec4899' }} />, title: 'Valet Parking', desc: 'Dedicated basement bays with round-the-clock valet service.', accent: '#ec4899' },
   ];
 
-  return (
-    <div ref={containerRef} className="w-full min-h-screen bg-[#020204] text-white selection:bg-[#00f2fe] selection:text-black overflow-x-hidden">
+  const { isDark } = useTheme();
+  const colors = useColors();
 
-      {/* ── SCROLL CANVAS ENGINE ── */}
-      <ScrollCanvas frameCount={240} isLoaded={isLoaded} setIsLoaded={setIsLoaded} />
+  return (
+    <div ref={containerRef} className="w-full min-h-screen text-white selection:bg-[#00f2fe] selection:text-black overflow-x-hidden" style={{ background: colors.bg, color: colors.text }}>
+
+      {/* ── SCROLL CANVAS ENGINE (dark mode only) ── */}
+      {isDark && <ScrollCanvas frameCount={240} isLoaded={isLoaded} setIsLoaded={setIsLoaded} />}
+      {!isDark && <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #f8fafc 100%)', zIndex: 0, pointerEvents: 'none' }} />}
 
       {/* ══ HERO (250vh sticky) ══ */}
       <section className="relative z-10" style={{ height: '250vh' }}>
@@ -296,7 +301,7 @@ const Home = () => {
 
           <motion.p
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.7 }}
-            style={{ fontSize: 'clamp(0.9rem, 1.5vw, 1.1rem)', color: '#94a3b8', maxWidth: '520px', lineHeight: 1.7, marginBottom: '3rem', fontWeight: 400 }}
+            style={{ fontSize: 'clamp(0.9rem, 1.5vw, 1.1rem)', color: isDark ? '#94a3b8' : '#475569', maxWidth: '520px', lineHeight: 1.7, marginBottom: '3rem', fontWeight: 400 }}
           >
             Pune's most premium coworking floor. Luxury meets productivity — reserve your seat in under 60 seconds.
           </motion.p>
@@ -341,38 +346,61 @@ const Home = () => {
           {/* CTA */}
           <motion.div
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }}
-            style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'nowrap', justifyContent: 'center', paddingBottom: '4rem' }}
+            style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', paddingBottom: '4rem' }}
           >
-            <button
-              onClick={() => navigate(isLoggedIn ? '/book' : '/signin')}
-              style={{
-                padding: '1rem 2.5rem', borderRadius: '999px',
-                background: 'linear-gradient(135deg, #00f2fe, #a855f7)',
-                border: 'none', cursor: 'pointer', color: '#000',
-                fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                whiteSpace: 'nowrap',
-                boxShadow: '0 0 40px rgba(0,242,254,0.25)',
-                transition: 'all 0.3s ease',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 0 60px rgba(0,242,254,0.45)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 0 40px rgba(0,242,254,0.25)'; e.currentTarget.style.transform = 'translateY(0)'; }}
-            >
-              <span>Reserve Your Seat</span><ArrowRight size={15} />
-            </button>
+            {/* Primary CTA */}
+            <div style={{ position: 'relative' }}>
+              {/* Pulse ring */}
+              <div style={{ position: 'absolute', inset: '-6px', borderRadius: '999px', border: '1.5px solid rgba(0,242,254,0.25)', animation: 'ctaPulse 2.5s ease-in-out infinite', pointerEvents: 'none' }} />
+              <button
+                onClick={() => navigate(isLoggedIn ? '/book' : '/signin')}
+                style={{
+                  padding: '1.1rem 2.8rem', borderRadius: '999px',
+                  background: 'linear-gradient(135deg, #00f2fe, #a855f7)',
+                  border: 'none', cursor: 'pointer', color: '#000',
+                  fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 0 40px rgba(0,242,254,0.3), 0 8px 24px rgba(0,0,0,0.2)',
+                  transition: 'all 0.3s ease',
+                  position: 'relative', zIndex: 1,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 0 70px rgba(0,242,254,0.5), 0 10px 32px rgba(0,0,0,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 0 40px rgba(0,242,254,0.3), 0 8px 24px rgba(0,0,0,0.2)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              >
+                <span>Reserve Your Seat</span><ArrowRight size={15} />
+              </button>
+            </div>
             <a
               href="#pricing"
               style={{
-                padding: '1rem 2rem', borderRadius: '999px',
+                padding: '1.1rem 2rem', borderRadius: '999px',
                 background: 'transparent',
-                border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', color: '#64748b',
+                border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.12)',
+                cursor: 'pointer', color: isDark ? '#94a3b8' : '#475569',
                 fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em',
                 textDecoration: 'none', transition: 'all 0.3s ease',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.color = '#e2e8f0'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#64748b'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(0,242,254,0.4)'; e.currentTarget.style.color = '#00f2fe'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'; e.currentTarget.style.color = isDark ? '#94a3b8' : '#475569'; }}
             >
               View Spaces
+            </a>
+            <a
+              href="#location"
+              style={{
+                padding: '1.1rem 1.75rem', borderRadius: '999px',
+                background: isDark ? 'rgba(168,85,247,0.06)' : 'rgba(168,85,247,0.08)',
+                border: '1px solid rgba(168,85,247,0.2)',
+                cursor: 'pointer', color: '#a855f7',
+                fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em',
+                textDecoration: 'none', transition: 'all 0.3s ease',
+                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(168,85,247,0.14)'; e.currentTarget.style.borderColor = 'rgba(168,85,247,0.4)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = isDark ? 'rgba(168,85,247,0.06)' : 'rgba(168,85,247,0.08)'; e.currentTarget.style.borderColor = 'rgba(168,85,247,0.2)'; }}
+            >
+              <Calendar size={13} /> Schedule a Tour
             </a>
           </motion.div>
 
@@ -390,10 +418,10 @@ const Home = () => {
       </section>
 
       {/* ══ SCROLLING CONTENT ══ */}
-      <div className="relative z-20 w-full" style={{ background: '#020204', boxShadow: '0 -60px 120px rgba(0,0,0,1)' }}>
+      <div className="relative z-20 w-full" style={{ background: colors.bg, boxShadow: isDark ? '0 -60px 120px rgba(0,0,0,1)' : '0 -60px 80px rgba(241,245,249,0.9)' }}>
 
         {/* ── Marquee ── */}
-        <MarqueeStrip />
+        <MarqueeStrip colors={colors} />
 
         {/* ── Stats Band ── */}
         <section style={{ padding: '5rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -411,16 +439,16 @@ const Home = () => {
                 viewport={{ once: true, margin: '-60px' }}
                 transition={{ duration: 0.6, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
                 style={{
-                  background: 'rgba(15,23,42,0.5)', border: '1px solid rgba(255,255,255,0.05)',
+                  background: colors.bgCard, border: `1px solid ${colors.border}`,
                   borderRadius: '20px', padding: '2rem', position: 'relative', overflow: 'hidden',
                 }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, transparent, ${s.accent}, transparent)` }} />
                 <div style={{ color: s.accent, marginBottom: '0.75rem' }}>{s.icon}</div>
-                <div style={{ fontSize: '2.5rem', fontWeight: 900, fontStyle: 'italic', color: '#fff', lineHeight: 1, marginBottom: '0.4rem' }}>
+                <div style={{ fontSize: '2.5rem', fontWeight: 900, fontStyle: 'italic', color: colors.text, lineHeight: 1, marginBottom: '0.4rem' }}>
                   <Counter target={s.value} suffix={s.suffix} />
                 </div>
-                <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#334155' }}>{s.label}</div>
+                <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: colors.textSubtle }}>{s.label}</div>
               </motion.div>
             ))}
           </div>
@@ -473,7 +501,7 @@ const Home = () => {
                   <TiltCard style={{ height: '100%' }}>
                     <div style={{
                       padding: '2rem', borderRadius: '18px', height: '100%', boxSizing: 'border-box',
-                      background: 'rgba(15,23,42,0.45)', border: '1px solid rgba(255,255,255,0.05)',
+                      background: colors.bgCard, border: `1px solid ${colors.border}`,
                       position: 'relative', overflow: 'hidden',
                     }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', background: `linear-gradient(90deg, transparent, ${item.accent}40, transparent)` }} />
@@ -484,8 +512,8 @@ const Home = () => {
                       }}>
                         {item.icon}
                       </div>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '0.5rem', color: '#e2e8f0' }}>{item.title}</h3>
-                      <p style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.65 }}>{item.desc}</p>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '0.5rem', color: colors.text }}>{item.title}</h3>
+                      <p style={{ fontSize: '0.8rem', color: colors.textMuted, lineHeight: 1.65 }}>{item.desc}</p>
                     </div>
                   </TiltCard>
                 </motion.div>
@@ -614,26 +642,44 @@ const Home = () => {
               </span>
               <br />starts here.
             </h2>
-            <p style={{ color: '#475569', fontSize: '0.9rem', marginBottom: '2.5rem', lineHeight: 1.7 }}>
+            <p style={{ color: isDark ? '#475569' : '#64748b', fontSize: '0.9rem', marginBottom: '2.5rem', lineHeight: 1.7 }}>
               Join 500+ founders, engineers, and creators who call SkyDesk360 their second home.
             </p>
-            <button
-              onClick={() => navigate(isLoggedIn ? '/book' : '/register')}
-              style={{
-                padding: '1.1rem 3rem', borderRadius: '999px',
-                background: 'linear-gradient(135deg, #00f2fe, #a855f7)',
-                border: 'none', cursor: 'pointer', color: '#000',
-                fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
-                whiteSpace: 'nowrap',
-                boxShadow: '0 0 60px rgba(0,242,254,0.2)',
-                transition: 'all 0.3s ease',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 0 80px rgba(0,242,254,0.4)'; e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 0 60px rgba(0,242,254,0.2)'; e.currentTarget.style.transform = 'translateY(0) scale(1)'; }}
-            >
-              <span>Get Started Free</span> <ArrowRight size={16} />
-            </button>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => navigate(isLoggedIn ? '/book' : '/register')}
+                style={{
+                  padding: '1.1rem 3rem', borderRadius: '999px',
+                  background: 'linear-gradient(135deg, #00f2fe, #a855f7)',
+                  border: 'none', cursor: 'pointer', color: '#000',
+                  fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 0 60px rgba(0,242,254,0.2)',
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 0 80px rgba(0,242,254,0.4)'; e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 0 60px rgba(0,242,254,0.2)'; e.currentTarget.style.transform = 'translateY(0) scale(1)'; }}
+              >
+                <span>Get Started Free</span> <ArrowRight size={16} />
+              </button>
+              <a
+                href="#pricing"
+                style={{
+                  padding: '1.1rem 2.25rem', borderRadius: '999px',
+                  background: 'transparent',
+                  border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.12)',
+                  cursor: 'pointer', color: isDark ? '#94a3b8' : '#475569',
+                  fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em',
+                  textDecoration: 'none', transition: 'all 0.3s ease',
+                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(0,242,254,0.4)'; e.currentTarget.style.color = '#00f2fe'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'; e.currentTarget.style.color = isDark ? '#94a3b8' : '#475569'; }}
+              >
+                Explore Spaces <ChevronRight size={14} />
+              </a>
+            </div>
           </motion.div>
         </section>
 
@@ -692,6 +738,11 @@ const Home = () => {
         @keyframes pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.5; transform: scale(0.85); }
+        }
+        @keyframes ctaPulse {
+          0% { opacity: 0.6; transform: scale(1); }
+          50% { opacity: 0; transform: scale(1.18); }
+          100% { opacity: 0; transform: scale(1.18); }
         }
         .group:hover .group-hover\\:opacity-100 { opacity: 1 !important; }
       `}</style>

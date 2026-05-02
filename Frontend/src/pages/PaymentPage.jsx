@@ -3,10 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, CreditCard, Smartphone, Building2,
-  Lock, Check, Shield, Sparkles
+  Lock, Check, Shield, Sparkles, Receipt
 } from 'lucide-react';
 import { createPaymentOrderBatch, verifyPayment } from '../lib/api';
 import { generateInvoice } from '../lib/generateInvoice';
+import { useColors } from '../contexts/ThemeContext';
 
 const DURATION_LABELS = { hourly: 'Hourly', daily: 'Daily', monthly: 'Monthly', yearly: 'Yearly' };
 
@@ -41,35 +42,13 @@ const loadRazorpayScript = () => new Promise((resolve) => {
   document.body.appendChild(script);
 });
 
-/* ─── Shared input style ─── */
-const inputSx = {
-  width: '100%',
-  background: 'rgba(255,255,255,0.03)',
-  border: '1px solid rgba(255,255,255,0.07)',
-  borderRadius: '12px',
-  padding: '0.85rem 1.1rem',
-  color: '#e2e8f0',
-  fontSize: '0.875rem',
-  outline: 'none',
-  boxSizing: 'border-box',
-  fontFamily: "'Inter', sans-serif",
-  transition: 'border-color 0.2s, box-shadow 0.2s',
-};
-const labelSx = {
-  display: 'block',
-  fontSize: '0.58rem',
-  fontWeight: 800,
-  textTransform: 'uppercase',
-  letterSpacing: '0.18em',
-  color: '#334155',
-  marginBottom: '0.45rem',
-};
-const onFocus = (e) => { e.target.style.borderColor = 'rgba(0,242,254,0.35)'; e.target.style.boxShadow = '0 0 0 3px rgba(0,242,254,0.05)'; };
-const onBlur  = (e) => { e.target.style.borderColor = 'rgba(255,255,255,0.07)'; e.target.style.boxShadow = 'none'; };
+/* ─── GST validation ─── */
+const GST_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
 const PaymentPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const colors = useColors();
   const { seats = [], durationUnit = 'monthly', durationQuantity = 1 } = location.state || {};
   const total = seats.reduce((sum, seat) => sum + computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity), 0);
 
@@ -78,6 +57,7 @@ const PaymentPage = () => {
   const [processing, setProcessing] = useState(false);
   const [bookingIds, setBookingIds] = useState([]);
   const [error, setError] = useState('');
+  const [gstNumber, setGstNumber] = useState('');
 
   const [cardNumber, setCardNumber] = useState('');
   const [cardName, setCardName]     = useState('');
@@ -85,6 +65,35 @@ const PaymentPage = () => {
   const [cvv, setCvv]               = useState('');
   const [upiId, setUpiId]           = useState('');
   const [selectedUpi, setSelectedUpi] = useState('');
+
+  /* Derived style helpers that depend on theme */
+  const inputSx = {
+    width: '100%',
+    background: colors.bgInput,
+    border: `1px solid ${colors.inputBorder}`,
+    borderRadius: '12px',
+    padding: '0.85rem 1.1rem',
+    color: colors.text,
+    fontSize: '0.875rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: "'Inter', sans-serif",
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+  };
+  const labelSx = {
+    display: 'block',
+    fontSize: '0.58rem',
+    fontWeight: 800,
+    textTransform: 'uppercase',
+    letterSpacing: '0.18em',
+    color: colors.textSubtle,
+    marginBottom: '0.45rem',
+  };
+  const onFocus = (e) => { e.target.style.borderColor = colors.inputBorderFocus; e.target.style.boxShadow = colors.inputFocusShadow; };
+  const onBlur  = (e) => { e.target.style.borderColor = colors.inputBorder; e.target.style.boxShadow = 'none'; };
+
+  const gstValid = gstNumber.length === 0 || GST_REGEX.test(gstNumber);
+  const gstWarning = gstNumber.length > 0 && !gstValid;
 
   const user = (() => { try { return JSON.parse(sessionStorage.getItem('user') || '{}'); } catch { return {}; } })();
 
@@ -160,7 +169,7 @@ const PaymentPage = () => {
 
   if (seats.length === 0 && !showSuccess) {
     return (
-      <div style={{ minHeight: '100vh', background: '#020204', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1.5rem', color: '#475569', fontFamily: "'Inter', sans-serif" }}>
+      <div style={{ minHeight: '100vh', background: colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1.5rem', color: colors.textMuted, fontFamily: "'Inter', sans-serif" }}>
         <div style={{ fontSize: '3rem' }}>🪑</div>
         <p style={{ fontSize: '0.9rem' }}>No seats selected.</p>
         <button onClick={() => navigate('/book')} style={{ padding: '0.75rem 2rem', borderRadius: '999px', border: '1px solid rgba(0,242,254,0.3)', background: 'transparent', color: '#00f2fe', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer' }}>
@@ -171,7 +180,7 @@ const PaymentPage = () => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#020204', color: '#fff', fontFamily: "'Inter', sans-serif", paddingTop: '90px' }}>
+    <div style={{ minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: "'Inter', sans-serif", paddingTop: '90px' }}>
 
       {/* ── Header ── */}
       <div style={{ textAlign: 'center', padding: '2rem 1.5rem 1rem' }}>
@@ -321,8 +330,45 @@ const PaymentPage = () => {
             </motion.div>
           </AnimatePresence>
 
+          {/* ── Optional GST Number ── */}
+          <div style={{ marginTop: '1.5rem', padding: '1.25rem 1.5rem', background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <Receipt size={14} color="#00f2fe" />
+              <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#00f2fe' }}>
+                GST Details
+              </span>
+              <span style={{ fontSize: '0.55rem', fontWeight: 600, color: colors.textSubtle, marginLeft: '0.25rem', border: `1px solid ${colors.border}`, borderRadius: '999px', padding: '0.1rem 0.5rem' }}>
+                Optional
+              </span>
+            </div>
+            <label style={labelSx}>GST Number</label>
+            <input
+              style={inputSx}
+              type="text"
+              placeholder="22AAAAA0000A1Z5"
+              maxLength={15}
+              value={gstNumber}
+              onChange={(e) => setGstNumber(e.target.value.toUpperCase().replace(/\s/g, ''))}
+              onFocus={onFocus}
+              onBlur={onBlur}
+            />
+            {gstWarning && (
+              <p style={{ fontSize: '0.62rem', color: '#f59e0b', marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                ⚠ Format: 22AAAAA0000A1Z5 — does not match GST pattern
+              </p>
+            )}
+            {gstNumber && gstValid && (
+              <p style={{ fontSize: '0.62rem', color: '#22c55e', marginTop: '0.4rem' }}>
+                ✓ GST number will appear on your invoice
+              </p>
+            )}
+            <p style={{ fontSize: '0.6rem', color: colors.textSubtle, marginTop: '0.5rem', lineHeight: 1.5 }}>
+              For business invoicing. Your GSTIN will be printed on the PDF invoice.
+            </p>
+          </div>
+
           {/* Secure badge */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '1.25rem', color: '#1e293b', fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '1.25rem', color: colors.textFaint, fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em' }}>
             <Lock size={11} />
             256-bit SSL · Razorpay Secured
           </div>
@@ -331,14 +377,14 @@ const PaymentPage = () => {
         {/* ── RIGHT — Order Summary ── */}
         <div style={{ flex: '1 1 280px', minWidth: '280px', position: 'sticky', top: '100px' }}>
           <div style={{
-            background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255,255,255,0.07)', borderRadius: '22px',
+            background: colors.bgCard, backdropFilter: 'blur(24px)',
+            border: `1px solid ${colors.border}`, borderRadius: '22px',
             padding: '1.75rem', position: 'relative', overflow: 'hidden',
           }}>
             {/* Top accent */}
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #00f2fe, #a855f7)' }} />
 
-            <p style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.25em', color: '#334155', marginBottom: '1.25rem' }}>
+            <p style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.25em', color: colors.textSubtle, marginBottom: '1.25rem' }}>
               Order Summary
             </p>
 
@@ -350,20 +396,20 @@ const PaymentPage = () => {
                   padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
                 }}>
                   <div>
-                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#e2e8f0' }}>{seat.id}</div>
-                    <div style={{ fontSize: '0.6rem', color: '#334155', marginTop: '0.1rem' }}>{seat.zone}</div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: colors.text }}>{seat.id}</div>
+                    <div style={{ fontSize: '0.6rem', color: colors.textSubtle, marginTop: '0.1rem' }}>{seat.zone}</div>
                   </div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#00f2fe' }}>
-                    ₹{formatPrice(computeDurationPrice(seat.price, durationUnit))}
+                    ₹{formatPrice(computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity))}
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Duration */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#334155', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: colors.textSubtle, marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: `1px solid ${colors.borderSubtle}` }}>
               <span>Billing</span>
-              <span style={{ fontWeight: 700, color: '#475569' }}>{DURATION_LABELS[durationUnit] || 'Monthly'}</span>
+              <span style={{ fontWeight: 700, color: colors.textMuted }}>{DURATION_LABELS[durationUnit] || 'Monthly'}</span>
             </div>
 
             {/* Total */}
@@ -481,7 +527,7 @@ const PaymentPage = () => {
 
               {/* Download Receipt */}
               <button
-                onClick={() => generateInvoice({ user, seats, durationUnit, durationQuantity, bookingIds, total })}
+                onClick={() => generateInvoice({ user, seats, durationUnit, durationQuantity, bookingIds, total, gstNumber })}
                 style={{
                   width: '100%', padding: '0.9rem', borderRadius: '14px', border: '1px solid rgba(0,242,254,0.35)',
                   background: 'rgba(0,242,254,0.06)',
