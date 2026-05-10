@@ -34,6 +34,7 @@ import {
   fetchAdminSeats,
   fetchAdminKYC,
   fetchKYCDocument,
+  fetchBookingKYCDocument,
   createAdminSeat,
   updateAdminSeat,
   lockAdminSeat,
@@ -43,7 +44,7 @@ import {
 } from '../lib/api';
 import {
   FloorPlanSVG, FLOOR_PLAN_SEATS, ZONE_PRIMARY_SEAT,
-  WHOLE_UNIT_TYPES, computeDurationPrice,
+  WHOLE_UNIT_TYPES, computeDurationPriceFromMonthlyPrice,
 } from '../components/FloorPlan';
 
 const loadRazorpayScript = () => new Promise((resolve) => {
@@ -53,6 +54,13 @@ const loadRazorpayScript = () => new Promise((resolve) => {
   script.onload = () => resolve(true);
   script.onerror = () => resolve(false);
   document.body.appendChild(script);
+});
+
+const fileToBase64 = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = () => reject(new Error('Failed to read file.'));
+  reader.readAsDataURL(file);
 });
 
 const AdminCRM = () => {
@@ -91,6 +99,13 @@ const AdminCRM = () => {
   const [adminDurationQty, setAdminDurationQty] = useState(1);
   const [adminUseCustom, setAdminUseCustom] = useState(false);
   const [adminCustomAmount, setAdminCustomAmount] = useState('');
+  const [adminCustomerName, setAdminCustomerName] = useState('');
+  const [adminCustomerEmail, setAdminCustomerEmail] = useState('');
+  const [adminCustomerMobile, setAdminCustomerMobile] = useState('');
+  const [adminCustomerGovIdType, setAdminCustomerGovIdType] = useState('');
+  const [adminCustomerGovIdNumber, setAdminCustomerGovIdNumber] = useState('');
+  const [adminCustomerKycFile, setAdminCustomerKycFile] = useState(null);
+  const [adminCustomerKycData, setAdminCustomerKycData] = useState(null);
   const [adminBookingLoading, setAdminBookingLoading] = useState(false);
   const [adminBookingError, setAdminBookingError] = useState(null);
   const [adminBookingSuccess, setAdminBookingSuccess] = useState(null);
@@ -143,6 +158,18 @@ const AdminCRM = () => {
     }
   };
 
+  const viewBookingKYCDocument = async (bookingId) => {
+    setKycDocLoading(true);
+    try {
+      const doc = await fetchBookingKYCDocument(bookingId);
+      setKycDocModal(doc);
+    } catch (err) {
+      setAdminBookingError(err?.message || 'Failed to load customer KYC document.');
+    } finally {
+      setKycDocLoading(false);
+    }
+  };
+
   const exportKYCToExcel = () => {
     const rows = kycRecords.map((u) => ({
       'Full Name': u.full_name,
@@ -184,9 +211,10 @@ const AdminCRM = () => {
 
   const filteredBookings = bookings.filter(
     (b) =>
-      b.user_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.seat_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.id.toLowerCase().includes(searchQuery.toLowerCase())
+      (b.customer_name || b.user_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (b.customer_email || b.user_email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (b.seat_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (b.id || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredSeats = seats.filter((s) => {
@@ -338,8 +366,32 @@ const AdminCRM = () => {
     }
   };
 
+  const handleAdminKycFileChange = async (file) => {
+    if (!file) {
+      setAdminCustomerKycFile(null);
+      setAdminCustomerKycData(null);
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setAdminBookingError('KYC file size must be 2 MB or smaller.');
+      return;
+    }
+    try {
+      const encoded = await fileToBase64(file);
+      setAdminCustomerKycFile(file);
+      setAdminCustomerKycData(encoded);
+      setAdminBookingError(null);
+    } catch (err) {
+      setAdminBookingError(err?.message || 'Failed to read KYC file.');
+    }
+  };
+
   const handleAdminPayment = async () => {
     if (adminBookingLoading || adminSelectedIds.length === 0) return;
+    if (!adminCustomerName.trim() || !adminCustomerEmail.trim()) {
+      setAdminBookingError('Customer name and email are required for admin booking.');
+      return;
+    }
     setAdminBookingLoading(true);
     setAdminBookingError(null);
     try {
@@ -348,6 +400,13 @@ const AdminCRM = () => {
         duration_unit: adminDurationUnit,
         duration_quantity: adminDurationQty,
         custom_amount: adminUseCustom && adminCustomAmount ? Number(adminCustomAmount) : null,
+        customer_name: adminCustomerName.trim(),
+        customer_email: adminCustomerEmail.trim(),
+        customer_mobile: adminCustomerMobile.trim() || null,
+        customer_gov_id_type: adminCustomerGovIdType.trim() || null,
+        customer_gov_id_number: adminCustomerGovIdNumber.trim() || null,
+        customer_kyc_document_name: adminCustomerKycFile?.name || null,
+        customer_kyc_document_data: adminCustomerKycData,
       };
       const order = await createAdminBookingOrder(payload);
       const loaded = await loadRazorpayScript();
@@ -359,7 +418,7 @@ const AdminCRM = () => {
         amount: order.amount,
         currency: order.currency,
         name: 'SkyDesk Pro',
-        description: `Admin booking: ${adminSelectedIds.length} seat(s) — ${adminDurationQty}× ${adminDurationUnit}`,
+        description: `Booking for ${adminCustomerName}: ${adminSelectedIds.length} seat(s)`,
         order_id: order.razorpay_order_id,
         prefill: { name: adminUser?.full_name || '', email: adminUser?.email || '' },
         theme: { color: '#00f2fe' },
@@ -383,6 +442,13 @@ const AdminCRM = () => {
             setAdminSelectedIds([]);
             setAdminCustomAmount('');
             setAdminUseCustom(false);
+            setAdminCustomerName('');
+            setAdminCustomerEmail('');
+            setAdminCustomerMobile('');
+            setAdminCustomerGovIdType('');
+            setAdminCustomerGovIdNumber('');
+            setAdminCustomerKycFile(null);
+            setAdminCustomerKycData(null);
             loadData();
           } catch (err) {
             setAdminBookingError(err?.message || 'Payment verification failed.');
@@ -436,7 +502,7 @@ const AdminCRM = () => {
   const adminVisibleSeats = useMemo(() =>
     adminEnrichedSeats.map((seat) => ({
       ...seat,
-      displayPrice: computeDurationPrice(seat.workspaceType, adminDurationUnit, adminDurationQty),
+      displayPrice: computeDurationPriceFromMonthlyPrice(seat.price, adminDurationUnit, adminDurationQty),
     })),
     [adminEnrichedSeats, adminDurationUnit, adminDurationQty]
   );
@@ -471,7 +537,7 @@ const AdminCRM = () => {
   const adminComputedTotal = useMemo(() =>
     adminEnrichedSeats
       .filter((s) => s.dbId && adminSelectedIds.includes(s.dbId))
-      .reduce((sum, s) => sum + computeDurationPrice(s.workspaceType, adminDurationUnit, adminDurationQty), 0),
+      .reduce((sum, s) => sum + computeDurationPriceFromMonthlyPrice(s.price, adminDurationUnit, adminDurationQty), 0),
     [adminEnrichedSeats, adminSelectedIds, adminDurationUnit, adminDurationQty]
   );
 
@@ -753,8 +819,27 @@ const AdminCRM = () => {
                           <span className="text-xs font-mono text-blue-400/80">{booking.id.slice(0, 8)}…</span>
                         </td>
                         <td className="px-8 py-5">
-                          <div className="text-sm font-bold text-white">{booking.user_name}</div>
-                          <div className="text-[10px] text-gray-500 mt-0.5">{booking.user_email}</div>
+                          <div className="text-sm font-bold text-white">
+                            {booking.customer_name || booking.user_name}
+                          </div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">
+                            {booking.customer_email || booking.user_email}
+                          </div>
+                          {booking.customer_mobile && (
+                            <div className="text-[10px] text-gray-500">{booking.customer_mobile}</div>
+                          )}
+                          {booking.customer_gov_id && (
+                            <div className="text-[10px] text-violet-300 mt-0.5">{booking.customer_gov_id}</div>
+                          )}
+                          {booking.customer_has_kyc_document && (
+                            <button
+                              onClick={() => viewBookingKYCDocument(booking.id)}
+                              disabled={kycDocLoading}
+                              style={{ marginTop: '0.35rem', fontSize: '0.53rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a855f7', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)', borderRadius: '6px', padding: '0.22rem 0.55rem', cursor: 'pointer' }}
+                            >
+                              View KYC
+                            </button>
+                          )}
                         </td>
                         <td className="px-8 py-5">
                           <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-md text-[10px] font-black text-blue-300 tracking-wider">
@@ -1064,7 +1149,7 @@ const AdminCRM = () => {
                   <ShoppingCart size={16} color="#22c55e" />
                   <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#22c55e' }}>Manual Booking</span>
                 </div>
-                <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0 }}>Select available seats, set duration, and optionally override the price.</p>
+                <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0 }}>Add customer details, select seats, set duration, and optionally override the price.</p>
               </div>
               {adminBookingSuccess && (
                 <button
@@ -1138,6 +1223,60 @@ const AdminCRM = () => {
 
                 {/* RIGHT — Duration + Amount + Pay */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px', padding: '1rem' }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#22c55e', marginBottom: '0.6rem' }}>
+                      Customer Details
+                    </div>
+                    <div style={{ display: 'grid', gap: '0.55rem' }}>
+                      <input
+                        value={adminCustomerName}
+                        onChange={(e) => setAdminCustomerName(e.target.value)}
+                        placeholder="Customer full name *"
+                        style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '9px', padding: '0.55rem 0.75rem', color: '#e2e8f0', fontSize: '0.72rem', outline: 'none', boxSizing: 'border-box' }}
+                      />
+                      <input
+                        type="email"
+                        value={adminCustomerEmail}
+                        onChange={(e) => setAdminCustomerEmail(e.target.value)}
+                        placeholder="Customer email *"
+                        style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '9px', padding: '0.55rem 0.75rem', color: '#e2e8f0', fontSize: '0.72rem', outline: 'none', boxSizing: 'border-box' }}
+                      />
+                      <input
+                        value={adminCustomerMobile}
+                        onChange={(e) => setAdminCustomerMobile(e.target.value)}
+                        placeholder="Mobile number (optional)"
+                        style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '9px', padding: '0.55rem 0.75rem', color: '#e2e8f0', fontSize: '0.72rem', outline: 'none', boxSizing: 'border-box' }}
+                      />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <input
+                          value={adminCustomerGovIdType}
+                          onChange={(e) => setAdminCustomerGovIdType(e.target.value)}
+                          placeholder="ID type (optional)"
+                          style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '9px', padding: '0.55rem 0.75rem', color: '#e2e8f0', fontSize: '0.72rem', outline: 'none', boxSizing: 'border-box' }}
+                        />
+                        <input
+                          value={adminCustomerGovIdNumber}
+                          onChange={(e) => setAdminCustomerGovIdNumber(e.target.value)}
+                          placeholder="ID number (optional)"
+                          style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '9px', padding: '0.55rem 0.75rem', color: '#e2e8f0', fontSize: '0.72rem', outline: 'none', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <label style={{ display: 'block', fontSize: '0.6rem', color: '#94a3b8' }}>
+                        KYC ID upload (optional, max 2 MB)
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(e) => handleAdminKycFileChange(e.target.files?.[0] || null)}
+                          style={{ width: '100%', marginTop: '0.35rem', color: '#94a3b8', fontSize: '0.65rem' }}
+                        />
+                      </label>
+                      {adminCustomerKycFile && (
+                        <span style={{ fontSize: '0.6rem', color: '#22c55e' }}>
+                          Attached: {adminCustomerKycFile.name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Duration */}
                   <div>

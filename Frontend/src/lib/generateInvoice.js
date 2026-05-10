@@ -15,24 +15,17 @@ const TYPE_LABELS = {
   meeting_room: 'Meeting Room',
 };
 
-const SEAT_PRICES = {
-  workstation:  { hourly: 100,  daily: 500,   monthly: 7500,  yearly: 81000  },
-  cabin:        { hourly: 500,  daily: 2500,  monthly: 40000, yearly: 432000 },
-  conference:   { hourly: 700,  daily: 4500,  monthly: 90000, yearly: 972000 },
-  meeting_room: { hourly: 700,  daily: 4500,  monthly: 16000, yearly: 900000 },
-};
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtPrice(v) {
   return 'Rs. ' + Math.round(v).toLocaleString('en-IN');
 }
 
-function unitRate(workspaceType, durationUnit) {
-  const p = SEAT_PRICES[workspaceType] || SEAT_PRICES.workstation;
-  if (durationUnit === 'hourly')  return p.hourly;
-  if (durationUnit === 'daily')   return p.daily;
-  if (durationUnit === 'yearly')  return p.yearly ?? p.monthly * 12 * 0.9;
-  return p.monthly;
+function unitRate(monthlyPrice, durationUnit) {
+  const monthly = Number(monthlyPrice) || 0;
+  if (durationUnit === 'hourly')  return monthly / 75;
+  if (durationUnit === 'daily')   return monthly / 15;
+  if (durationUnit === 'yearly')  return monthly * 12 * 0.9;
+  return monthly;
 }
 
 /** Draw a left→right gradient bar. fromRgb / toRgb = [r, g, b] */
@@ -271,7 +264,7 @@ export function generateInvoice({ user, seats, durationUnit, durationQuantity, b
     doc.line(ML, rowY + rowH, W - MR, rowY + rowH);
 
     const wType   = seat.workspaceType || 'workstation';
-    const rate1   = unitRate(wType, durationUnit);
+    const rate1   = unitRate(seat.price, durationUnit);
     const seatAmt = rate1 * durationQuantity;
     const period  = `${durationQuantity} x ${DURATION_LABELS[durationUnit] || 'Monthly'}`;
 

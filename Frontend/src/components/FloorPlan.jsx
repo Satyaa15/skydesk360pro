@@ -41,6 +41,15 @@ export const computeDurationPrice = (workspaceType, durationUnit, quantity = 1) 
   return rate * quantity;
 };
 
+export const computeDurationPriceFromMonthlyPrice = (monthlyPrice, durationUnit, quantity = 1) => {
+  const monthly = Number(monthlyPrice) || 0;
+  let rate = monthly;
+  if (durationUnit === 'hourly') rate = monthly / 75;
+  else if (durationUnit === 'daily') rate = monthly / 15;
+  else if (durationUnit === 'yearly') rate = monthly * 12 * 0.9;
+  return rate * quantity;
+};
+
 export const formatPrice = (value) => {
   const rounded = Math.round(value * 100) / 100;
   return rounded.toLocaleString();

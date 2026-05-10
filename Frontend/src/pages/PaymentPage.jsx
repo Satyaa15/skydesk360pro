@@ -8,25 +8,9 @@ import {
 import { createPaymentOrderBatch, verifyPayment } from '../lib/api';
 import { generateInvoice } from '../lib/generateInvoice';
 import { useColors } from '../contexts/ThemeContext';
+import { computeDurationPriceFromMonthlyPrice } from '../components/FloorPlan';
 
 const DURATION_LABELS = { hourly: 'Hourly', daily: 'Daily', monthly: 'Monthly', yearly: 'Yearly' };
-
-// Must stay in sync with backend pricing.SEAT_PRICES
-const SEAT_PRICES = {
-  workstation:  { hourly: 100,  daily: 500,   monthly: 7500,  yearly: 81000   },
-  cabin:        { hourly: 500,  daily: 2500,  monthly: 40000, yearly: 432000  },
-  conference:   { hourly: 700,  daily: 4500,  monthly: 90000, yearly: 972000  },
-  meeting_room: { hourly: 700,  daily: 4500,  monthly: 16000, yearly: 900000  },
-};
-
-const computeDurationPrice = (workspaceType, durationUnit, quantity = 1) => {
-  const prices = SEAT_PRICES[workspaceType] || SEAT_PRICES.workstation;
-  const rate = durationUnit === 'hourly' ? prices.hourly
-    : durationUnit === 'daily'   ? prices.daily
-    : durationUnit === 'yearly'  ? (prices.yearly ?? prices.monthly * 12 * 0.9)
-    : prices.monthly;
-  return rate * quantity;
-};
 
 const formatPrice = (value) => {
   const rounded = Math.round(value * 100) / 100;
@@ -50,7 +34,7 @@ const PaymentPage = () => {
   const location = useLocation();
   const colors = useColors();
   const { seats = [], durationUnit = 'monthly', durationQuantity = 1 } = location.state || {};
-  const total = seats.reduce((sum, seat) => sum + computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity), 0);
+  const total = seats.reduce((sum, seat) => sum + computeDurationPriceFromMonthlyPrice(seat.price, durationUnit, durationQuantity), 0);
 
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [showSuccess, setShowSuccess] = useState(false);
@@ -400,7 +384,7 @@ const PaymentPage = () => {
                     <div style={{ fontSize: '0.6rem', color: colors.textSubtle, marginTop: '0.1rem' }}>{seat.zone}</div>
                   </div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#00f2fe' }}>
-                    ₹{formatPrice(computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity))}
+                    ₹{formatPrice(computeDurationPriceFromMonthlyPrice(seat.price, durationUnit, durationQuantity))}
                   </div>
                 </div>
               ))}

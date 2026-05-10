@@ -94,6 +94,16 @@ class BookingBase(SQLModel):
     duration_unit: BookingDuration = Field(default=BookingDuration.MONTHLY)
     duration_quantity: int = Field(default=1)
     price_amount: float = Field(default=0)
+    customer_name: Optional[str] = Field(default=None)
+    customer_email: Optional[str] = Field(default=None)
+    customer_mobile: Optional[str] = Field(default=None)
+    customer_gov_id_type: Optional[str] = Field(default=None)
+    customer_gov_id_number: Optional[str] = Field(default=None)
+    customer_kyc_document_name: Optional[str] = Field(default=None)
+    customer_kyc_document_data: Optional[str] = Field(
+        default=None,
+        sa_column=Column("customer_kyc_document_data", Text, nullable=True),
+    )
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 

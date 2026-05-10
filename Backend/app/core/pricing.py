@@ -21,6 +21,32 @@ def _to_decimal(value: float | int | str) -> Decimal:
     return Decimal(str(value))
 
 
+def monthly_to_rate(monthly_amount: float | int | str, duration_unit: BookingDuration) -> float:
+    """
+    Convert a seat's monthly base price into a unit rate.
+    Ratios align with existing default pricing:
+    hourly = monthly / 75, daily = monthly / 15, yearly = monthly * 12 * 0.9.
+    """
+    monthly = _to_decimal(monthly_amount)
+
+    if duration_unit == BookingDuration.HOURLY:
+        rate = monthly / Decimal("75")
+    elif duration_unit == BookingDuration.DAILY:
+        rate = monthly / Decimal("15")
+    elif duration_unit == BookingDuration.YEARLY:
+        rate = monthly * Decimal("12") * _YEARLY_DISCOUNT
+    else:
+        rate = monthly
+
+    return float(rate.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def compute_amount_from_monthly_price(monthly_amount: float | int | str, duration_unit: BookingDuration, quantity: int = 1) -> float:
+    rate = _to_decimal(monthly_to_rate(monthly_amount, duration_unit))
+    total = rate * _to_decimal(quantity)
+    return float(total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
 def compute_amount(seat_type: str, duration_unit: BookingDuration, quantity: int = 1) -> float:
     """Return the total booking amount for the given seat type, duration, and quantity."""
     prices = SEAT_PRICES.get(seat_type, SEAT_PRICES[_DEFAULT_TYPE])

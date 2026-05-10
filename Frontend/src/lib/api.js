@@ -187,6 +187,12 @@ export const fetchKYCDocument = async (userId) => {
   return res.json();
 };
 
+export const fetchBookingKYCDocument = async (bookingId) => {
+  const res = await fetch(`${API_BASE_URL}/admin/bookings/${bookingId}/kyc-document`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+};
+
 export const verifyPayment = async (payload) => {
   const res = await fetch(`${API_BASE_URL}/payment/verify`, {
     method: 'POST',

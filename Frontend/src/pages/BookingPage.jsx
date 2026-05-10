@@ -7,7 +7,7 @@ import { fetchSeats } from '../lib/api';
 import {
   FloorPlanSVG, FLOOR_PLAN_SEATS, ZONE_COLORS,
   WHOLE_UNIT_TYPES, ZONE_PRIMARY_SEAT, ZONE_DISPLAY_LABEL,
-  SEAT_PRICES, computeDurationPrice, formatPrice,
+  computeDurationPriceFromMonthlyPrice, formatPrice,
 } from '../components/FloorPlan';
 
 /* ─── BookingPage-only constants ─── */
@@ -126,7 +126,7 @@ const BookingPage = () => {
       : enrichedSeats.filter((s) => s.workspaceType === activeFilter);
     return filtered.map((seat) => ({
       ...seat,
-      displayPrice: computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity),
+      displayPrice: computeDurationPriceFromMonthlyPrice(seat.price, durationUnit, durationQuantity),
     }));
   }, [activeFilter, enrichedSeats, durationUnit, durationQuantity]);
 
@@ -171,7 +171,7 @@ const BookingPage = () => {
 
   // Cabins charge once per zone (not per individual seat).
   const totalPrice = useMemo(() => {
-    return selectedSeats.reduce((sum, s) => sum + computeDurationPrice(s.workspaceType, durationUnit, durationQuantity), 0);
+    return selectedSeats.reduce((sum, s) => sum + computeDurationPriceFromMonthlyPrice(s.price, durationUnit, durationQuantity), 0);
   }, [selectedSeats, durationUnit, durationQuantity]);
 
   const selectionBreakdown = useMemo(() =>
@@ -401,7 +401,7 @@ const BookingPage = () => {
                             <span className="bp-seat-type">{WORKSPACE_LABELS[seat.workspaceType]}</span>
                           </div>
                           <div className="bp-seat-actions">
-                            <span className="bp-seat-price">₹{formatPrice(computeDurationPrice(seat.workspaceType, durationUnit, durationQuantity))}</span>
+                            <span className="bp-seat-price">₹{formatPrice(computeDurationPriceFromMonthlyPrice(seat.price, durationUnit, durationQuantity))}</span>
                             <button className="bp-remove-btn" onClick={() => removeSeat(seat.id)} title="Remove"><X size={13} /></button>
                           </div>
                         </motion.div>

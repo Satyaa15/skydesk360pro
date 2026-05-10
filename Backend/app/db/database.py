@@ -40,6 +40,13 @@ def _run_migrations():
         "ALTER TABLE booking ADD COLUMN IF NOT EXISTS duration_unit     VARCHAR DEFAULT 'monthly'",
         "ALTER TABLE booking ADD COLUMN IF NOT EXISTS duration_quantity INTEGER DEFAULT 1",
         "ALTER TABLE booking ADD COLUMN IF NOT EXISTS price_amount      DOUBLE PRECISION DEFAULT 0",
+        "ALTER TABLE booking ADD COLUMN IF NOT EXISTS customer_name              VARCHAR",
+        "ALTER TABLE booking ADD COLUMN IF NOT EXISTS customer_email             VARCHAR",
+        "ALTER TABLE booking ADD COLUMN IF NOT EXISTS customer_mobile            VARCHAR",
+        "ALTER TABLE booking ADD COLUMN IF NOT EXISTS customer_gov_id_type       VARCHAR",
+        "ALTER TABLE booking ADD COLUMN IF NOT EXISTS customer_gov_id_number     VARCHAR",
+        "ALTER TABLE booking ADD COLUMN IF NOT EXISTS customer_kyc_document_name VARCHAR",
+        "ALTER TABLE booking ADD COLUMN IF NOT EXISTS customer_kyc_document_data TEXT",
         "ALTER TABLE booking ADD COLUMN IF NOT EXISTS start_time        TIMESTAMP WITH TIME ZONE",
         "ALTER TABLE booking ADD COLUMN IF NOT EXISTS end_time          TIMESTAMP WITH TIME ZONE",
         # KYC fields on user table

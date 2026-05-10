@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 from app.db.database import get_session
 from app.models.models import Booking, BookingStatus, BookingDuration, Seat, User
 from app.core.auth import get_current_user
-from app.core.pricing import compute_amount
+from app.core.pricing import compute_amount_from_monthly_price
 from datetime import datetime, timezone
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
@@ -72,7 +72,7 @@ def create_booking(
         session.commit()
 
     # Create pending booking
-    booking_amount = compute_amount(seat.type, body.duration_unit, body.duration_quantity)
+    booking_amount = compute_amount_from_monthly_price(seat.price, body.duration_unit, body.duration_quantity)
     booking = Booking(
         user_id=current_user.id,
         seat_id=seat_id,

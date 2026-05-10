@@ -703,7 +703,7 @@ const Home = () => {
                   </h2>
                   <p style={{ color: '#475569', fontSize: '0.82rem', lineHeight: 1.7, display: 'flex', gap: '0.75rem', marginBottom: '2rem' }}>
                     <MapPin size={16} color="#00f2fe" style={{ flexShrink: 0, marginTop: '3px' }} />
-                    14th Floor, Maruti Millennium Tower, Pune Bangalore Highway Pashan Exit, Baner Annex, Baner, Pune, Maharashtra 411045
+                    14th Floor, Maruti Millennium Tower, Pune-Bangalore Highway, Pashan Exit, Baner Annex, Pune, Maharashtra 411045
                   </p>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     {[['🚇', 'Metro: 8 min'], ['✈️', 'Airport: 25 min'], ['🅿️', 'Valet Parking']].map(([icon, label]) => (

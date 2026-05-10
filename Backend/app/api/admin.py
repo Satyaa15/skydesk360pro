@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, func
 from pydantic import BaseModel
 from app.db.database import get_session
-from app.models.models import Booking, User, Seat, SeatType, BookingStatus, BookingDuration, Payment, PaymentStatus, RazorpayPaymentStatus
+from app.models.models import Booking, User, Seat, SeatType, BookingStatus, BookingDuration, RazorpayPaymentStatus
 from app.core.auth import admin_required, get_current_user
-from app.core.pricing import compute_amount, to_paise, compute_end_time
+from app.core.pricing import compute_amount_from_monthly_price, to_paise
 from typing import List, Optional
 from datetime import datetime, timezone
 import sqlalchemy
@@ -29,6 +29,12 @@ class AdminBookingSummary(BaseModel):
     user_name: str
     user_email: str
     gov_id: str
+    customer_name: str | None
+    customer_email: str | None
+    customer_mobile: str | None
+    customer_gov_id: str | None
+    customer_kyc_document_name: str | None
+    customer_has_kyc_document: bool
     seat_code: str
     status: str
     date: datetime
@@ -108,6 +114,16 @@ def get_all_bookings(session: Session = Depends(get_session)):
             "user_name": user.full_name,
             "user_email": user.email,
             "gov_id": f"{user.gov_id_type}: {user.gov_id_number}",
+            "customer_name": booking.customer_name,
+            "customer_email": booking.customer_email,
+            "customer_mobile": booking.customer_mobile,
+            "customer_gov_id": (
+                f"{booking.customer_gov_id_type}: {booking.customer_gov_id_number}"
+                if booking.customer_gov_id_type and booking.customer_gov_id_number
+                else None
+            ),
+            "customer_kyc_document_name": booking.customer_kyc_document_name,
+            "customer_has_kyc_document": bool(booking.customer_kyc_document_data),
             "seat_code": seat.code,
             "status": booking.status.value,
             "date": booking.booking_date,
@@ -325,6 +341,24 @@ def get_kyc_document(user_id: str, session: Session = Depends(get_session)):
     }
 
 
+@router.get("/bookings/{booking_id}/kyc-document")
+def get_booking_kyc_document(booking_id: str, session: Session = Depends(get_session)):
+    from uuid import UUID as _UUID
+    try:
+        bid = _UUID(booking_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid booking ID")
+    booking = session.get(Booking, bid)
+    if not booking:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    if not booking.customer_kyc_document_data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No customer KYC uploaded")
+    return {
+        "document_name": booking.customer_kyc_document_name or "customer-kyc",
+        "document_data": booking.customer_kyc_document_data,
+    }
+
+
 @router.post("/seats/reset-availability")
 def reset_seat_availability(session: Session = Depends(get_session)):
     session.exec(sqlalchemy.update(Seat).values(is_available=True))
@@ -339,6 +373,13 @@ class AdminBookingOrderRequest(BaseModel):
     duration_unit: BookingDuration = BookingDuration.MONTHLY
     duration_quantity: int = 1
     custom_amount: Optional[float] = None   # override computed price (total, in INR)
+    customer_name: str
+    customer_email: str
+    customer_mobile: str | None = None
+    customer_gov_id_type: str | None = None
+    customer_gov_id_number: str | None = None
+    customer_kyc_document_name: str | None = None
+    customer_kyc_document_data: str | None = None
 
 
 class AdminBookingOrderResponse(BaseModel):
@@ -364,6 +405,10 @@ def admin_create_booking_order(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Duration quantity must be at least 1")
     if not body.seat_ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one seat required")
+    if not body.customer_name.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Customer name is required")
+    if not body.customer_email.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Customer email is required")
 
     seats = session.exec(select(Seat).where(Seat.id.in_(body.seat_ids))).all()
     seat_map = {seat.id: seat for seat in seats}
@@ -402,7 +447,7 @@ def admin_create_booking_order(
 
     # Compute per-seat amounts
     computed_total = sum(
-        compute_amount(seat_map[sid].type, body.duration_unit, body.duration_quantity)
+        compute_amount_from_monthly_price(seat_map[sid].price, body.duration_unit, body.duration_quantity)
         for sid in body.seat_ids
     )
     total_amount = body.custom_amount if body.custom_amount and body.custom_amount > 0 else computed_total
@@ -419,6 +464,13 @@ def admin_create_booking_order(
             duration_unit=body.duration_unit,
             duration_quantity=body.duration_quantity,
             price_amount=per_seat_amount,
+            customer_name=body.customer_name.strip(),
+            customer_email=body.customer_email.strip(),
+            customer_mobile=(body.customer_mobile or "").strip() or None,
+            customer_gov_id_type=(body.customer_gov_id_type or "").strip() or None,
+            customer_gov_id_number=(body.customer_gov_id_number or "").strip() or None,
+            customer_kyc_document_name=(body.customer_kyc_document_name or "").strip() or None,
+            customer_kyc_document_data=body.customer_kyc_document_data,
         )
         session.add(booking)
         session.flush()
