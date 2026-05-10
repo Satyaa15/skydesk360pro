@@ -30,3 +30,7 @@ docker run --rm -p 5173:4173 skydesk-frontend
 
 - Authentication uses backend API endpoints (`/auth/register` and `/auth/login`).
 - Production build is code-split with lazy routes.
+- SPA refresh/deep-link support:
+  - Apache/LiteSpeed: `public/.htaccess` rewrites all routes to `index.html`.
+  - Static hosts with custom 404 pages: `public/404.html` redirects back to the original route.
+  - Render Static Site: add rewrite `/* -> /index.html` in Render Dashboard if needed.
